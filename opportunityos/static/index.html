@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OpportunityOS · Personal workspace</title>
+<link rel="stylesheet" href="/style.css">
+<script src="/app.js" defer></script>
+</head>
+<body>
+<div class="shell">
+<aside class="sidebar">
+  <div class="brand"><span class="mark">✳</span><div>OpportunityOS<small>PERSONAL WORKSPACE</small></div></div>
+  <div class="nav-label">WORKSPACE</div>
+  <nav id="nav" aria-label="Workspace"></nav>
+  <div class="sidebar-foot"><span class="dot"></span> Local workspace <button id="theme" aria-label="Toggle color theme">◐</button></div>
+</aside>
+<main>
+  <header class="top"><span id="crumb">Workspace / Dashboard</span><div class="agent"><span id="agent-status"></span><button id="pause">Pause</button><button id="stop">Stop</button><button id="run" class="primary">▶ Run now</button></div></header>
+  <div id="content" aria-live="off"><p>Opening workspace…</p></div>
+</main>
+</div>
+<dialog id="detail" aria-labelledby="detail-title"><article id="detail-body"></article><form method="dialog"><button>Close</button></form></dialog>
+<div id="toast" role="status"></div>
+</body>
+</html>
