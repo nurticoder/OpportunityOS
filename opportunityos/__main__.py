@@ -43,6 +43,7 @@ def snapshot(store, agent):
                 "sources": BOARDS, "health": [dict(r) for r in db.execute("SELECT * FROM health")],
                 "documents": [dict(r) for r in db.execute("SELECT * FROM documents ORDER BY added DESC")],
                 "mail": [dict(r) for r in db.execute("SELECT kind, subject, at FROM mail_events WHERE kind NOT IN ('Archived', 'Unclassified') ORDER BY rowid DESC LIMIT 20")],
+                "revision": db.execute("SELECT COALESCE(MAX(rowid), 0) FROM activity").fetchone()[0],
                 "activity": [dict(r) for r in db.execute("SELECT * FROM activity ORDER BY rowid DESC LIMIT 80")]}
 
 
@@ -91,6 +92,10 @@ def handler_for(store, agent, port):
     authority = f"127.0.0.1:{port}"
 
     class Handler(BaseHTTPRequestHandler):
+        def log_request(self, code="-", size="-"):
+            if isinstance(code, int) and code >= 500:
+                self.log_message("Local request failed with HTTP %d", code)
+
         def send(self, data, kind, status=200):
             self.send_response(status)
             self.send_header("Content-Type", kind)
@@ -111,6 +116,10 @@ def handler_for(store, agent, port):
             path = urlsplit(self.path).path
             if path == "/api/state":
                 return self.json(snapshot(store, agent))
+            if path == "/api/heartbeat":
+                with store.db() as db:
+                    revision = db.execute("SELECT COALESCE(MAX(rowid), 0) FROM activity").fetchone()[0]
+                return self.json({"agent": agent.state, "revision": revision})
             assets = {"/": ("index.html", "text/html"), "/style.css": ("style.css", "text/css"),
                       "/app.js": ("app.js", "text/javascript"), "/sandbox": ("sandbox.html", "text/html"),
                       "/sandbox.js": ("sandbox.js", "text/javascript")}

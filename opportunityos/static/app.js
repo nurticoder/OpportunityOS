@@ -18,11 +18,14 @@ async function load() {
   const response = await fetch("/api/state");
   if (!response.ok) throw Error("Local workspace is unavailable");
   data = await response.json();
-  $("#agent-status").textContent = data.agent;
-  $("#run").textContent = data.agent === "Paused" ? "▶ Resume" : "▶ Run now";
-  $("#run").disabled = ["Running","Stopping"].includes(data.agent);
-  $("#pause").disabled = data.agent !== "Running";
-  $("#stop").disabled = ["Stopped","Stopping"].includes(data.agent);
+  renderAgent(data.agent);
+}
+function renderAgent(state) {
+  $("#agent-status").textContent = state;
+  $("#run").textContent = state === "Paused" ? "▶ Resume" : "▶ Run now";
+  $("#run").disabled = ["Running","Stopping"].includes(state);
+  $("#pause").disabled = state !== "Running";
+  $("#stop").disabled = ["Stopped","Stopping"].includes(state);
 }
 async function mutate(path, body, message) {
   const response = await fetch("/api/" + path, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
@@ -140,7 +143,7 @@ document.addEventListener("click", async e => {
   try {
     if (b.dataset.nav) {
       $("#detail").close();
-      page=b.dataset.nav; render(); window.scrollTo(0,0);
+      page=b.dataset.nav; await load(); render(); window.scrollTo(0,0);
     } else if (b.dataset.detail) showDetail(b.dataset.detail);
     else if (b.id === "inspect-form") {
       const id = selected.id;
@@ -191,4 +194,15 @@ document.addEventListener("submit", async e=>{
 $("#theme").onclick=()=>{const root=document.documentElement;root.dataset.theme=root.dataset.theme==="dark"?"light":"dark";localStorage.setItem("theme",root.dataset.theme);};
 document.documentElement.dataset.theme=localStorage.getItem("theme") || (matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");
 load().then(render).catch(e=>flash(e.message));
-setInterval(async()=>{try{const prev=data?.activity[0]?.message+data?.activity[0]?.at;await load();if(["Dashboard","Agent Activity"].includes(page) && prev!==data.activity[0]?.message+data.activity[0]?.at)render();}catch{}},3500);
+setInterval(async () => {
+  try {
+    const response = await fetch("/api/heartbeat");
+    if (!response.ok) return;
+    const {agent, revision} = await response.json();
+    renderAgent(agent);
+    if (["Dashboard","Agent Activity"].includes(page) && data?.revision !== revision) {
+      await load();
+      render();
+    }
+  } catch {}
+}, 3500);
