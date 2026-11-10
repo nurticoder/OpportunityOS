@@ -4,7 +4,7 @@ A local opportunity desk with an evidence-backed discovery feed and application 
 
 ## Start on this Mac
 
-Use Python 3.10 or newer. The dashboard and discovery require no packages.
+The dashboard on this Mac is already installed as a login service. Open http://127.0.0.1:8765. The manual command below is for running with the login service stopped. Use Python 3.10 or newer. The dashboard and discovery require no packages.
 
 ```sh
 ./start.sh --data ../../work/local-data
@@ -16,6 +16,10 @@ Open http://127.0.0.1:8765. This installation's private data directory already c
 2. In **Discover**, filter listings, open their evidence and check the official listing and public portal questions where available.
 3. Enter the actual prompt and word limit. Prepare a draft, edit it in **Review Center**, then mark it ready.
 4. Apply on the official portal. Record its confirmation in **Applications** and track the outcome there.
+
+## Run at macOS login
+
+This Mac uses a per-user LaunchAgent to keep the dashboard available. To install it on another Mac from the checkout directory, run `python3 -m opportunityos.service install`. Pass `--data /path/to/private/data` when using an existing database. Stop any foreground server on the same port before installing. Use `python3 -m opportunityos.service status`, `restart`, or `uninstall` to manage the service. Keep the checkout at its installed location, or reinstall the service after moving it. The app still respects its discovery window and the Mac's sleep state.
 
 ## Optional components
 
@@ -29,7 +33,7 @@ Open http://127.0.0.1:8765. This installation's private data directory already c
 - Python's standard library serves a loopback-only dashboard and JSON API. SQLite stores facts, discovery evidence, settings, and application history. Local documents are private file copies. The app uses owner-only data permissions, same-origin mutation checks, an asset CSP and escaped UI output. Use OS disk encryption for encrypted storage. A process already running under your macOS account is trusted by this local app.
 - The discovery adapter reads five public employer Greenhouse feeds. It deduplicates by source ID and URL, keeps removed postings for history, and excludes old snapshots from active ranking. A board's public listing is a discovery signal. Use the official portal to confirm open status and the exact requirements. [Greenhouse Job Board API](https://docs.greenhouse.io/job-board)
 - Ranking uses title-based alignment and degree clues, official-board evidence and disclosed pay text. Citizenship, age, work authorization, and many other criteria remain manual checks. Scores indicate relative priority and do not estimate acceptance odds.
-- The foreground scheduler checks every 30 seconds and defaults to Monday, Wednesday and Friday, 7–9 p.m. Hong Kong time. It runs only while the app is open and the Mac is awake, with an optional AC-only setting. Missed windows defer to the next permitted window. Stop and Pause take effect between source fetches and are reset on process restart.
+- The foreground scheduler checks every 30 seconds and defaults to Monday, Wednesday and Friday, 7–9 p.m. Hong Kong time. It runs while the server is running and the Mac is awake, with an optional AC-only setting. Missed windows defer to the next permitted window. Stop and Pause take effect between source fetches and are reset on process restart.
 
 ## Tests
 

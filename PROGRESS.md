@@ -12,7 +12,7 @@
 ## Partially implemented
 
 - Coverage is limited to public internship/fellowship listings on five employer boards. Portal question metadata is read-only and may be unavailable. The sandbox is the only browser form adapter.
-- Funding uses published pay text. Most structured eligibility criteria, deadline extraction, urgency, competitiveness and fee assessment remain manual. Schedule behavior is tested with synthetic times. No login daemon or unattended run during sleep is configured.
+- Funding uses published pay text. Most structured eligibility criteria, deadline extraction, urgency, competitiveness and fee assessment remain manual. Schedule behavior is tested with synthetic times. A macOS LaunchAgent starts the dashboard at login and keeps it available while logged in. Discovery still waits for the configured work window and does not run during sleep.
 - Document import stores copies without extracting facts. Drafting has a tested offline outline and an optional Ollama provider that has not been exercised against an installed model.
 - Gmail has a metadata-only CLI and dashboard signals. Real OAuth, Keychain persistence, and Gmail account behavior require a configured client and consent. This connector does not match messages to individual applications or synchronize automatically.
 
@@ -23,3 +23,7 @@
 3. Authenticate and test Gmail, add conservative message-to-application matching, and add opt-in Telegram notifications.
 4. Implement the documented ChatGPT OAuth flow with protected credentials, user-approved context and visible plan/credit controls.
 5. Add a verified launchd setup and per-source retry checkpoints. Consider university deployment after personal workflows and data controls are stable.
+
+## Availability fix
+
+- Installed and verified the per-user macOS service against the existing 95-listing database. Browser polling uses a small heartbeat response between activity changes.
