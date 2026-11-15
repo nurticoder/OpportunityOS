@@ -3,7 +3,7 @@ import threading
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from .discovery import BOARDS, refresh
+from .sources import BOARDS, refresh, source_names
 from .store import now
 
 HK = ZoneInfo("Asia/Hong_Kong")
@@ -60,7 +60,7 @@ class Agent:
         failed = 0
         completed = True
         try:
-            for board in settings["enabled_sources"]:
+            for board in list(settings["enabled_sources"]) + ["telegram:" + c for c in settings.get("telegram_channels", [])]:
                 with self.condition:
                     while self.state == "Paused":
                         if scheduled and not permitted(settings, datetime.now(HK)):
@@ -78,7 +78,7 @@ class Agent:
                     with self.store.db() as db:
                         db.execute("INSERT OR REPLACE INTO health VALUES (?, ?, ?, 0)",
                                    (board, now(), type(error).__name__))
-                    self.store.log(f"{BOARDS[board]} · fetch unavailable ({type(error).__name__})")
+                    self.store.log(f"{source_names(settings).get(board, board)} · fetch unavailable ({type(error).__name__})")
             if scheduled and completed and failed == 0:
                 with self.store.db() as db:
                     db.execute("INSERT OR REPLACE INTO settings VALUES ('last_scheduled', json_quote(?))",

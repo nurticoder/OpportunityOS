@@ -27,3 +27,16 @@
 ## Availability fix
 
 - Installed and verified the per-user macOS service against the existing 95-listing database. Browser polling uses a small heartbeat response between activity changes.
+
+## Telegram to Google Form slice — November 16, 2026
+
+- Preserved store.py, workflow.py and the existing profile/facts UI. The new checkout is in the current Internship OS workspace.
+- Replaced discovery.py with sources/greenhouse.py and sources/telegram.py, with extraction.py as a separate step. Existing Greenhouse IDs and stored applications remain compatible.
+- Added raw Telegram text, permalink, publication date, extraction fields, missing-criterion flags, explicit profile restrictions before scoring, deadline expiry filtering and persistent application preferences.
+- Added a configurable channel list and a source allow-list for prefill. The demonstration channel opportunity_alerts was chosen during implementation and added to local discovery. Form-fill sources remain opt-in.
+- Demonstrated 20 live posts through the dashboard to the real 2026 Future of Work Summit Google Form. Synthetic verified name/email values were filled, unresolved questions were shown and the local review screenshot was displayed. No real applicant data or form response was sent in this demonstration.
+- 14 backend tests passed, including nationality rejection before scoring and allow-list denial. The live Chrome end-to-end test passed. Node syntax validation passed.
+- The Google adapter handles visible recognized text fields on the first page. Uploaded documents, radio choices, subjective answers, login and multi-page progression require manual handling. Raw claims are evidence, not independent verification. Unsupported deadline/eligibility wording stays unknown.
+- The legacy blocker function remains byte-for-byte in workflow.py as requested. The new Google Form path does not use it, and cannot submit. Per-submission approvals, Gmail CV drafting and the UI redesign are deferred beyond this first slice.
+
+- Repaired login startup by staging the runtime and copying the existing private database/documents to ~/Library/Application Support/OpportunityOS/data. The original data folder remains as a backup. Confirmed the heartbeat and live service snapshot after installation.

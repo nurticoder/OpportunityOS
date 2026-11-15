@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from opportunityos.__main__ import import_document, snapshot
 from opportunityos.agent import Agent, HK, permitted
-from opportunityos.discovery import refresh
+from opportunityos.sources import refresh
 from opportunityos.evaluation import evaluate
 from opportunityos.store import Store
 from opportunityos.workflow import BLOCKERS, policy, prepare, transition

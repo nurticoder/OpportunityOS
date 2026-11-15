@@ -41,7 +41,7 @@ function card(item) {
     '</h3><span class="muted">' + esc(item.organization + " · " + item.location) + '</span><p>' + esc(item.matches.join(" · ") || item.category) +
     '</p><button data-detail="' + esc(item.id) + '">View evidence →</button></article>';
 }
-const active = () => data.items.filter(i => i.state === "Listed" && i.eligibility !== "Ineligible");
+const active = () => data.items.filter(i => i.state === "Listed" && i.eligibility !== "Ineligible" && i.choice !== "skip");
 const review = () => data.apps.filter(a => a.status === "Awaiting review");
 function dashboard() {
   const picks = active().slice(0,6);
@@ -52,7 +52,7 @@ function dashboard() {
     '<div class="section"><h2>Recent activity</h2><button data-nav="Agent Activity">Open activity</button></div>' + activity(data.activity.slice(0,3));
 }
 function listings() {
-  const hits = (filter.hidden ? data.items : active()).filter(i =>
+  const hits = (filter.hidden ? data.items.filter(i=>i.state !== "Expired") : active()).filter(i =>
     (!filter.group || i.group === filter.group) && (!filter.pay || i.funding !== "Unknown") &&
     [i.title,i.organization,i.location,...i.matches].join(" ").toLowerCase().includes(filter.q.toLowerCase()));
   $("#listings").innerHTML = '<p class="muted">' + hits.length + ' opportunities</p>' +
@@ -60,7 +60,7 @@ function listings() {
 }
 function discover() {
   const groups = [...new Set(data.items.map(i=>i.group))].sort();
-  return heading("Discover","Live employer listings ranked for your profile. Open a listing to check the evidence.") +
+  return heading("Discover","Public posts and employer listings ranked for your profile. Open a listing to check the evidence.") +
     '<div class="toolbar"><input id="search" type="search" aria-label="Search opportunities" placeholder="Search role, company or location" value="' + esc(filter.q) +
     '"><select id="group" aria-label="Recommendation group"><option value="">All groups</option>' +
     groups.map(g=>'<option'+(g===filter.group?' selected':'')+'>'+esc(g)+'</option>').join("") +
@@ -73,8 +73,13 @@ function showDetail(id) {
   $("#detail-body").innerHTML = '<div class="eyebrow">'+esc(i.organization+" · "+i.category)+'</div><h2 id="detail-title">'+esc(i.title)+'</h2>' +
     '<p><span class="chip">'+esc(i.state+" · "+i.eligibility)+'</span> <strong>'+i.score+' / 100</strong></p><p>'+esc(i.reason)+
     ' '+esc(i.matches.length ? "Matches: "+i.matches.join(", ")+".":"")+'</p><p><strong>Verify:</strong> '+esc(i.unknown.join("; "))+'</p><p><strong>Deadline:</strong> '+esc(i.deadline || "Unknown")+' · <strong>Location:</strong> '+esc(i.location)+
-    '</p><p><strong>Pay evidence:</strong> '+esc(i.funding)+'</p><p>'+link(i.url,"Open official listing")+" · "+link(i.evidence,"Source feed")+" · Checked "+esc(i.checked.slice(0,10))+'</p><details><summary>Employer description</summary><pre class="description">'+esc(i.description)+'</pre></details>' +
-    '<p><button id="inspect-form">Check portal questions</button></p><div id="portal-questions"></div>' +
+    '</p><p><strong>Pay evidence:</strong> '+esc(i.funding)+'</p><p>'+link(i.url,"Open application link")+" · "+link(i.evidence,"Source feed")+" · Checked "+esc(i.checked.slice(0,10))+'</p><details><summary>Employer description</summary><pre class="description">'+esc(i.description)+'</pre></details>' +
+    '<p><strong>Apply via</strong> '+esc(i.apply_method || "portal")+' · <strong>Documents mentioned</strong> '+esc((i.required_documents || []).join(", ") || "Unknown")+'</p>' +
+    '<form id="choice-form"><label>Application preference <select name="choice">'+
+      [["auto","Apply automatically"],["review","Review first"],["skip","Skip"]].map(([v,t])=>'<option value="'+v+'" '+(i.choice===v?'selected':'')+'>'+t+'</option>').join("")+
+      '</select></label><p class="muted">Every submission requires your explicit approval. Google Form prefill stops at local review.</p><button>Save preference</button></form>' +
+    (i.apply_method === "google_form" ? '<p><button id="prefill-form">Prefill Google Form for review</button></p><div id="prefill-result"></div>' :
+      i.id.startsWith("greenhouse:") ? '<p><button id="inspect-form">Check portal questions</button></p><div id="portal-questions"></div>' : "") +
     (existing ? '<p><button data-nav="Applications">Open existing application</button></p>' : i.state !== "Listed" || i.eligibility === "Ineligible" ? "" :
       '<form id="draft-form" class="stack"><label>Application question (optional)<textarea name="prompt" maxlength="5000" placeholder="Paste the actual question when available"></textarea></label><label>Word limit <input name="words" type="number" min="1" max="1200" value="250" required></label><button class="primary">Prepare draft for review</button></form>');
   $("#detail").showModal();
@@ -88,7 +93,7 @@ function application(a) {
     for (const status of ["Awaiting response","Interview","Selected"]) if (status !== a.status) actions.push([status,status]);
   }
   actions.push(a.status==="Archived" ? ["restore","Restore"] : ["archive","Move to archive"]);
-  return '<details class="box" data-app="'+esc(a.opportunity)+'"><summary>'+esc(i.title)+' <span class="chip">'+esc(a.status)+'</span></summary><p>'+link(i.url,"Open official listing")+' · '+esc(a.method)+'</p>' +
+  return '<details class="box" data-app="'+esc(a.opportunity)+'"><summary>'+esc(i.title)+' <span class="chip">'+esc(a.status)+'</span></summary><p>'+link(i.url,"Open application link")+' · '+esc(a.method)+'</p>' +
     (a.missing.length ? '<p class="muted">Unmapped standard fields: '+esc(a.missing.map(label).join(", "))+'</p>' : "") +
     (fieldList ? '<ul>'+fieldList+'</ul>' : "") +
     (a.prompt ? '<p><strong>Original question · '+a.words+' words</strong></p><pre>'+esc(a.prompt)+'</pre>' : "") +
@@ -101,6 +106,7 @@ function apps(onlyReview) {
   const items = onlyReview ? review() : data.apps.filter(a=>a.status!=="Archived");
   const archived = data.apps.filter(a=>a.status==="Archived");
   return heading(onlyReview?"Review Center":"Applications",onlyReview?"Check claims, requirements and word limits before marking a draft ready.":"Track prepared applications and record confirmed outcomes.") +
+    (onlyReview ? '<div id="form-reviews"></div>' : "") +
     (items.length ? '<div class="stack">'+items.map(application).join("")+'</div>' : empty(onlyReview?"No drafts awaiting review.":"No active applications.")) +
     (!onlyReview && data.mail.length ? '<div class="section"><h2>Gmail signals</h2></div><div class="stack">'+
       data.mail.map(m=>'<div class="box"><span class="chip">'+esc(m.kind)+'</span> '+esc(m.subject)+'</div>').join("")+'</div>' : "") +
@@ -122,8 +128,9 @@ function settings() {
     '<h2>Working window · Hong Kong</h2><div class="row">'+["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((d,n)=>'<label><input type="checkbox" name="days" value="'+n+'" '+(s.days.includes(n)?"checked":"")+'> '+d+'</label>').join("")+'</div>'+
     '<div class="row"><label>Starts <input name="start" type="time" value="'+esc(s.start)+'" required></label><label>Ends <input name="end" type="time" value="'+esc(s.end)+'" required></label></div>'+
     '<label><input name="ac_only" type="checkbox" '+(s.ac_only?"checked":"")+'> Run on AC power only</label><h2>Official employer boards</h2><div class="row">'+
-    Object.entries(data.sources).map(([k,v])=>'<label><input type="checkbox" name="sources" value="'+esc(k)+'" '+(s.enabled_sources.includes(k)?"checked":"")+'> '+esc(v)+'</label>').join("")+
-    '</div><h2>Ranking weights</h2><div class="form-grid">'+Object.entries(s.weights).map(([k,v])=>'<label>'+esc(label(k))+' <input type="number" min="0" max="100" required name="'+esc(k)+'" value="'+v+'"></label>').join("")+
+    Object.entries(data.sources).filter(([k])=>!k.startsWith("telegram:")).map(([k,v])=>'<label><input type="checkbox" name="sources" value="'+esc(k)+'" '+(s.enabled_sources.includes(k)?"checked":"")+'> '+esc(v)+'</label>').join("")+
+    '</div><h2>Public Telegram channels</h2><label>Channel usernames, separated by spaces<textarea name="telegram_channels" placeholder="channel_one channel_two">'+esc((s.telegram_channels || []).join(" "))+'</textarea></label>'+
+    '<label>Sources allowed for form prefill<textarea name="source_allowlist" placeholder="telegram:channel_one">'+esc((s.source_allowlist || []).join(" "))+'</textarea></label><p class="muted">Adding a channel enables discovery. The allow-list permits verified, share-approved facts to be entered in its linked Google Forms when you click Prefill.</p><h2>Ranking weights</h2><div class="form-grid">'+Object.entries(s.weights).map(([k,v])=>'<label>'+esc(label(k))+' <input type="number" min="0" max="100" required name="'+esc(k)+'" value="'+v+'"></label>').join("")+
     '</div><h2>Drafting</h2><label>Ollama model (optional)<input name="ollama_model" maxlength="100" value="'+esc(s.ollama_model)+'" placeholder="Installed local model"></label><label>Essay style and instructions<textarea name="essay_style" maxlength="2000">'+esc(s.essay_style)+'</textarea></label><button class="primary">Save settings</button></form></div>';
 }
 function render() {
@@ -135,6 +142,7 @@ function render() {
       '<div class="row">'+data.health.map(h=>'<span class="chip">'+esc(data.sources[h.source]+" · "+h.status+" · "+h.count)+'</span>').join("")+
       '</div><div class="section"><h2>Run history</h2></div>'+activity(data.activity),"Settings":settings})[page]();
   if (page==="Discover") listings();
+  if (page==="Review Center") loadFormReviews();
   for (const el of document.querySelectorAll("[data-app]")) el.open=openApps.includes(el.dataset.app);
 }
 document.addEventListener("click", async e => {
@@ -145,6 +153,23 @@ document.addEventListener("click", async e => {
       $("#detail").close();
       page=b.dataset.nav; await load(); render(); window.scrollTo(0,0);
     } else if (b.dataset.detail) showDetail(b.dataset.detail);
+    else if (b.dataset.formReview) {
+      showDetail(b.dataset.opportunity);
+      watchReview(b.dataset.formReview);
+    }
+    else if (b.dataset.closeReview) {
+      await mutate("review-close",{id:b.dataset.closeReview},"Review browser closed");
+    }
+    else if (b.id === "prefill-form") {
+      b.disabled = true;
+      try {
+        const response = await fetch("/api/prefill", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:selected.id})});
+        const result = await response.json();
+        if (!response.ok) throw Error(result.error);
+        $("#prefill-result").textContent = "Preparing form…";
+        watchReview(result.review);
+      } finally { b.disabled = false; }
+    }
     else if (b.id === "inspect-form") {
       const id = selected.id;
       b.disabled = true;
@@ -175,7 +200,10 @@ document.addEventListener("submit", async e=>{
   const button=f.querySelector("button");
   button.disabled=true;
   try {
-    if (f.id==="draft-form") {
+    if (f.id==="choice-form") {
+      await mutate("choice",{id:selected.id,choice:v.get("choice")},"Preference saved");
+      selected = data.items.find(i=>i.id===selected.id);
+    } else if (f.id==="draft-form") {
       await mutate("draft",{id:selected.id,prompt:v.get("prompt"),words:Number(v.get("words"))},"Draft placed in the Review Center");
       $("#detail").close(); page="Review Center"; render();
     } else if (f.dataset.action) await mutate("application",{...Object.fromEntries(v),id:f.closest("[data-app]").dataset.app,action:f.dataset.action},"Application updated");
@@ -206,3 +234,37 @@ setInterval(async () => {
     }
   } catch {}
 }, 3500);
+
+async function watchReview(id) {
+  try {
+    const response = await fetch("/api/reviews");
+    if (!response.ok) throw Error("Could not load form review");
+    const {reviews} = await response.json();
+    const review = reviews.find(r=>r.id===id);
+    const target = $("#prefill-result");
+    if (!target) return;
+    if (!review || review.status==="Running") {
+      setTimeout(()=>watchReview(id),2000);
+      return;
+    }
+    target.innerHTML = review.error ? empty(review.error) :
+      '<h3>Form prepared · review required</h3><p>'+esc(review.title)+'</p><button data-close-review="'+review.id+'">Close prepared browser</button>'+
+      '<ul>'+review.fields.map(f=>'<li>'+esc(f.label)+' · '+(f.filled?'Filled from verified fact':esc(f.attention))+'</li>').join("")+'</ul>'+
+      '<p>'+link(review.url,"Open original form to continue manually")+'</p><p class="muted">The filled browser stays open for up to 10 minutes with submission blocked. This screenshot is saved locally. The original link opens a fresh form.</p>'+
+      '<img alt="Google Form prefill review" class="review-image" src="/api/review/'+review.id+'">';
+  } catch (error) { flash(error.message); }
+}
+
+async function loadFormReviews() {
+  try {
+    const response=await fetch("/api/reviews");
+    if (!response.ok) return;
+    const {reviews}=await response.json();
+    const target=$("#form-reviews");
+    if (!target || !reviews.length) return;
+    target.innerHTML='<div class="section"><h2>Prepared Google Forms</h2></div><div class="stack">'+reviews.map(r=>{
+      const item=data.items.find(i=>i.id===r.opportunity);
+      return item ? '<div class="box"><strong>'+esc(item.title)+'</strong><p>'+esc(r.status)+'</p><button data-form-review="'+r.id+'" data-opportunity="'+esc(r.opportunity)+'">Open form review</button></div>' : "";
+    }).join("")+'</div>';
+  } catch {}
+}

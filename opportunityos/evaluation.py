@@ -1,5 +1,8 @@
 import re
 
+from .eligibility import hard_filter
+from .extraction import expired
+
 TOPICS = {
     "ai": r"\b(ai|artificial intelligence|machine learning|ml|deep learning|llm)\b",
     "robotics": r"robotics|autonomous|simulation|perception",
@@ -13,6 +16,12 @@ TOPICS = {
 
 
 def evaluate(item, facts, weights):
+    rejected, requirements_unknown = hard_filter(item, facts)
+    if expired(item) or rejected:
+        return {"score": 0, "eligibility": "Ineligible", "group": "Ineligible",
+                "matches": [], "unknown": requirements_unknown,
+                "reason": "Deadline expired" if expired(item) else "; ".join(rejected),
+                "funding": "Unknown", "location": item.get("location", "Unknown")}
     text = item["description"]
     title = item["title"]
     interests = " ".join(facts[key]["value"].lower() for key in ("interests", "program"))
@@ -23,7 +32,11 @@ def evaluate(item, facts, weights):
     undergrad_allowed = bool(re.search(r"\b(bs|bachelor|undergraduate)\b", title, re.I))
     graduate_only = graduate and not undergrad_allowed
     excluded = graduate_only and academic["verified"] and academic["value"].lower() == "undergraduate"
-    unknown = ["Work authorization and sponsorship", "Citizenship and age rules",
+    if excluded:
+        return {"score": 0, "eligibility": "Ineligible", "group": "Ineligible", "matches": [],
+                "unknown": [], "reason": "Listing title specifies graduate study and your verified level is undergraduate.",
+                "funding": "Unknown", "location": item.get("location", "Unknown")}
+    unknown = requirements_unknown + ["Work authorization and sponsorship", "Citizenship and age rules",
                "Skills, availability and travel requirements"]
     if not academic["verified"] or not undergrad_allowed:
         unknown.append("Required degree and enrollment dates")
@@ -31,7 +44,7 @@ def evaluate(item, facts, weights):
     pay = next((line[:280] for line in text.splitlines()
                 if re.search(r"(?:\$|€|£)\s*\d", line) and re.search(r"pay|salary|stipend|compensation|hour|range", line, re.I)), None)
     signals = {"alignment": min(1, len(matches) * .45), "eligibility": .55 if undergrad_allowed else 0 if graduate_only else .15,
-               "credibility": 1, "funding": .7 if pay else 0}
+               "credibility": 0.4 if item.get("id", "").startswith("telegram:") else 1, "funding": .7 if pay else 0}
     score = round(sum(weights[k] * signals[k] for k in signals) * 100 / sum(weights.values()))
     return {
         "score": 0 if excluded else score,

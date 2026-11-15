@@ -1,10 +1,27 @@
 {
-  "days": [0, 2, 4],
+  "days": [
+    0,
+    2,
+    4
+  ],
   "start": "19:00",
   "end": "21:00",
   "ac_only": false,
-  "weights": {"alignment": 40, "eligibility": 25, "credibility": 20, "funding": 15},
+  "weights": {
+    "alignment": 40,
+    "eligibility": 25,
+    "credibility": 20,
+    "funding": 15
+  },
   "essay_style": "Concise, evidence-driven and direct",
   "ollama_model": "",
-  "enabled_sources": ["waymo", "figma", "cloudflare", "databricks", "scaleai"]
+  "enabled_sources": [
+    "waymo",
+    "figma",
+    "cloudflare",
+    "databricks",
+    "scaleai"
+  ],
+  "telegram_channels": [],
+  "source_allowlist": []
 }
