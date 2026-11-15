@@ -1,0 +1,1364 @@
+{
+  "model": "qwen3:4b",
+  "threshold": 0.8,
+  "totals": {
+    "correct": 84,
+    "populated": 70,
+    "populated_correct": 67,
+    "unknown_gold": 17,
+    "unknown_correct": 17,
+    "known_gold": 83,
+    "abstentions": 13
+  },
+  "results": [
+    {
+      "id": "english-labelled",
+      "engine": "ollama",
+      "model": "qwen3:4b",
+      "seconds": 48.22,
+      "correct": 10,
+      "total": 10,
+      "fields": {
+        "title": {
+          "value": "AI Summer Internship",
+          "confidence": 1.0,
+          "evidence": "AI Summer Internship"
+        },
+        "organization": {
+          "value": "Aurora Lab",
+          "confidence": 1.0,
+          "evidence": "Aurora Lab"
+        },
+        "type": {
+          "value": "internship",
+          "confidence": 1.0,
+          "evidence": "AI Summer Internship"
+        },
+        "deadline": {
+          "value": "2026-12-15",
+          "confidence": 1.0,
+          "evidence": "15 December 2026"
+        },
+        "nationality": {
+          "value": [
+            "Kyrgyzstan"
+          ],
+          "confidence": 1.0,
+          "evidence": "Nationality: Kyrgyzstan"
+        },
+        "country_of_study": {
+          "value": [
+            "Hong Kong"
+          ],
+          "confidence": 1.0,
+          "evidence": "Country of study: Hong Kong"
+        },
+        "level": {
+          "value": [
+            "undergraduate"
+          ],
+          "confidence": 1.0,
+          "evidence": "Level: Undergraduate"
+        },
+        "required_documents": {
+          "value": [
+            "CV",
+            "Transcript"
+          ],
+          "confidence": 1.0,
+          "evidence": "CV, transcript"
+        },
+        "application_link": {
+          "value": "https://forms.gle/demoAurora",
+          "confidence": 1.0,
+          "evidence": "Apply: https://forms.gle/demoAurora"
+        },
+        "apply_method": {
+          "value": "google_form",
+          "confidence": 1.0,
+          "evidence": "Apply: https://forms.gle/demoAurora"
+        }
+      },
+      "raw_response": {
+        "title": {
+          "value": "AI Summer Internship",
+          "confidence": 1.0,
+          "evidence": "AI Summer Internship"
+        },
+        "organization": {
+          "value": "Aurora Lab",
+          "confidence": 1.0,
+          "evidence": "Aurora Lab"
+        },
+        "type": {
+          "value": "internship",
+          "confidence": 1.0,
+          "evidence": "AI Summer Internship"
+        },
+        "deadline": {
+          "value": "2026-12-15",
+          "confidence": 1.0,
+          "evidence": "15 December 2026"
+        },
+        "required_documents": {
+          "value": [
+            "CV",
+            "transcript"
+          ],
+          "confidence": 1.0,
+          "evidence": "CV, transcript"
+        },
+        "application_link": {
+          "value": "https://forms.gle/demoAurora",
+          "confidence": 1.0,
+          "evidence": "Apply: https://forms.gle/demoAurora"
+        },
+        "apply_method": {
+          "value": "google_form",
+          "confidence": 1.0,
+          "evidence": "Apply: https://forms.gle/demoAurora"
+        },
+        "eligibility": {
+          "nationality": {
+            "value": [
+              "Kyrgyzstan"
+            ],
+            "confidence": 1.0,
+            "evidence": "Nationality: Kyrgyzstan"
+          },
+          "country_of_study": {
+            "value": [
+              "Hong Kong"
+            ],
+            "confidence": 1.0,
+            "evidence": "Country of study: Hong Kong"
+          },
+          "level": {
+            "value": [
+              "undergraduate"
+            ],
+            "confidence": 1.0,
+            "evidence": "Level: Undergraduate"
+          }
+        }
+      },
+      "errors": {}
+    },
+    {
+      "id": "russian-scholarship",
+      "engine": "ollama",
+      "model": "qwen3:4b",
+      "seconds": 56.12,
+      "correct": 8,
+      "total": 10,
+      "fields": {
+        "title": {
+          "value": "Стипендия «Алга 2027»",
+          "confidence": 1.0,
+          "evidence": "Стипендия «Алга 2027»"
+        },
+        "organization": {
+          "value": "Фонд Алга",
+          "confidence": 1.0,
+          "evidence": "Организатор: Фонд Алга"
+        },
+        "type": {
+          "value": "scholarship",
+          "confidence": 1.0,
+          "evidence": "Стипендия «Алга 2027»"
+        },
+        "deadline": {
+          "value": "2027-01-20",
+          "confidence": 1.0,
+          "evidence": "Дедлайн подачи — 20 января 2027 года."
+        },
+        "nationality": {
+          "value": [
+            "Kyrgyzstan"
+          ],
+          "confidence": 1.0,
+          "evidence": "Только для граждан Кыргызстана"
+        },
+        "country_of_study": {
+          "value": [
+            "Hong Kong"
+          ],
+          "confidence": 1.0,
+          "evidence": "обучающихся в Гонконге"
+        },
+        "level": {
+          "value": "unknown",
+          "confidence": 0,
+          "evidence": ""
+        },
+        "required_documents": {
+          "value": [
+            "CV",
+            "Academic transcript"
+          ],
+          "confidence": 1.0,
+          "evidence": "Нужно приложить резюме и академическую выписку."
+        },
+        "application_link": {
+          "value": "https://example.invalid/alga/apply",
+          "confidence": 1.0,
+          "evidence": "Заявка: https://example.invalid/alga/apply"
+        },
+        "apply_method": {
+          "value": "portal",
+          "confidence": 1.0,
+          "evidence": "Заявка: https://example.invalid/alga/apply"
+        }
+      },
+      "raw_response": {
+        "title": {
+          "value": "Стипендия «Алга 2027»",
+          "confidence": 1.0,
+          "evidence": "Стипендия «Алга 2027»"
+        },
+        "organization": {
+          "value": "Фонд Алга",
+          "confidence": 1.0,
+          "evidence": "Организатор: Фонд Алга"
+        },
+        "type": {
+          "value": "scholarship",
+          "confidence": 1.0,
+          "evidence": "Стипендия «Алга 2027»"
+        },
+        "deadline": {
+          "value": "2027-01-20",
+          "confidence": 1.0,
+          "evidence": "Дедлайн подачи — 20 января 2027 года."
+        },
+        "required_documents": {
+          "value": [
+            "CV",
+            "Academic transcript"
+          ],
+          "confidence": 1.0,
+          "evidence": "Нужно приложить резюме и академическую выписку."
+        },
+        "application_link": {
+          "value": "https://example.invalid/alga/apply",
+          "confidence": 1.0,
+          "evidence": "Заявка: https://example.invalid/alga/apply"
+        },
+        "apply_method": {
+          "value": "portal",
+          "confidence": 1.0,
+          "evidence": "Заявка: https://example.invalid/alga/apply"
+        },
+        "eligibility": {
+          "nationality": {
+            "value": [
+              "Kyrgyzstan"
+            ],
+            "confidence": 1.0,
+            "evidence": "Только для граждан Кыргызстана"
+          },
+          "country_of_study": {
+            "value": [
+              "Hong Kong"
+            ],
+            "confidence": 1.0,
+            "evidence": "обучающихся в Гонконге"
+          },
+          "level": {
+            "value": "unknown",
+            "confidence": 1.0,
+            "evidence": "на бакалавриате"
+          }
+        }
+      },
+      "errors": {
+        "level": {
+          "expected": [
+            "undergraduate"
+          ],
+          "actual": "unknown"
+        },
+        "required_documents": {
+          "expected": [
+            "CV",
+            "Transcript"
+          ],
+          "actual": [
+            "CV",
+            "Academic transcript"
+          ]
+        }
+      }
+    },
+    {
+      "id": "mixed-research",
+      "engine": "ollama",
+      "model": "qwen3:4b",
+      "seconds": 50.54,
+      "correct": 9,
+      "total": 10,
+      "fields": {
+        "title": {
+          "value": "AI Research Internship — Vector Lab",
+          "confidence": 1.0,
+          "evidence": "AI Research Internship — Vector Lab"
+        },
+        "organization": {
+          "value": "Vector Lab",
+          "confidence": 1.0,
+          "evidence": "Company: Vector Lab"
+        },
+        "type": {
+          "value": "internship",
+          "confidence": 1.0,
+          "evidence": "AI Research Internship"
+        },
+        "deadline": {
+          "value": "2026-12-05",
+          "confidence": 1.0,
+          "evidence": "Apply by 5 декабря 2026 года"
+        },
+        "nationality": {
+          "value": [
+            "Kyrgyzstan",
+            "China"
+          ],
+          "confidence": 1.0,
+          "evidence": "Гражданство: Кыргызстан или Китай"
+        },
+        "country_of_study": {
+          "value": [
+            "Hong Kong"
+          ],
+          "confidence": 1.0,
+          "evidence": "Country of study: Hong Kong"
+        },
+        "level": {
+          "value": "unknown",
+          "confidence": 0,
+          "evidence": ""
+        },
+        "required_documents": {
+          "value": [
+            "CV",
+            "Cover letter"
+          ],
+          "confidence": 1.0,
+          "evidence": "Submit CV + cover letter"
+        },
+        "application_link": {
+          "value": "mailto:internships@example.invalid",
+          "confidence": 1.0,
+          "evidence": "Пишите на internships@example.invalid"
+        },
+        "apply_method": {
+          "value": "email",
+          "confidence": 1.0,
+          "evidence": "Пишите на internships@example.invalid"
+        }
+      },
+      "raw_response": {
+        "title": {
+          "value": "AI Research Internship — Vector Lab",
+          "confidence": 1.0,
+          "evidence": "AI Research Internship — Vector Lab"
+        },
+        "organization": {
+          "value": "Vector Lab",
+          "confidence": 1.0,
+          "evidence": "Company: Vector Lab"
+        },
+        "type": {
+          "value": "internship",
+          "confidence": 1.0,
+          "evidence": "AI Research Internship"
+        },
+        "deadline": {
+          "value": "2026-12-05",
+          "confidence": 1.0,
+          "evidence": "Apply by 5 декабря 2026 года"
+        },
+        "required_documents": {
+          "value": [
+            "CV",
+            "cover letter"
+          ],
+          "confidence": 1.0,
+          "evidence": "Submit CV + cover letter"
+        },
+        "application_link": {
+          "value": "mailto:internships@example.invalid",
+          "confidence": 1.0,
+          "evidence": "Пишите на internships@example.invalid"
+        },
+        "apply_method": {
+          "value": "email",
+          "confidence": 1.0,
+          "evidence": "Пишите на internships@example.invalid"
+        },
+        "eligibility": {
+          "nationality": {
+            "value": [
+              "Kyrgyzstan",
+              "China"
+            ],
+            "confidence": 1.0,
+            "evidence": "Гражданство: Кыргызстан или Китай"
+          },
+          "country_of_study": {
+            "value": [
+              "Hong Kong"
+            ],
+            "confidence": 1.0,
+            "evidence": "Country of study: Hong Kong"
+          },
+          "level": {
+            "value": "unknown",
+            "confidence": 1.0,
+            "evidence": "Только бакалавриат"
+          }
+        }
+      },
+      "errors": {
+        "level": {
+          "expected": [
+            "undergraduate"
+          ],
+          "actual": "unknown"
+        }
+      }
+    },
+    {
+      "id": "event-not-deadline",
+      "engine": "ollama",
+      "model": "qwen3:4b",
+      "seconds": 39.08,
+      "correct": 9,
+      "total": 10,
+      "fields": {
+        "title": {
+          "value": "Youth Futures Forum",
+          "confidence": 1.0,
+          "evidence": "Youth Futures Forum"
+        },
+        "organization": {
+          "value": "unknown",
+          "confidence": 0,
+          "evidence": ""
+        },
+        "type": {
+          "value": "unknown",
+          "confidence": 0,
+          "evidence": ""
+        },
+        "deadline": {
+          "value": "unknown",
+          "confidence": 0,
+          "evidence": ""
+        },
+        "nationality": {
+          "value": "unknown",
+          "confidence": 0,
+          "evidence": ""
+        },
+        "country_of_study": {
+          "value": "unknown",
+          "confidence": 0,
+          "evidence": ""
+        },
+        "level": {
+          "value": "unknown",
+          "confidence": 0,
+          "evidence": ""
+        },
+        "required_documents": {
+          "value": "unknown",
+          "confidence": 0,
+          "evidence": ""
+        },
+        "application_link": {
+          "value": "unknown",
+          "confidence": 0,
+          "evidence": ""
+        },
+        "apply_method": {
+          "value": "unknown",
+          "confidence": 0,
+          "evidence": ""
+        }
+      },
+      "raw_response": {
+        "title": {
+          "value": "Youth Futures Forum",
+          "confidence": 1.0,
+          "evidence": "Youth Futures Forum"
+        },
+        "organization": {
+          "value": "unknown",
+          "confidence": 0.0,
+          "evidence": "Организатор пока не указан."
+        },
+        "type": {
+          "value": "summit",
+          "confidence": 1.0,
+          "evidence": "A youth forum is type summit."
+        },
+        "deadline": {
+          "value": "unknown",
+          "confidence": 0.0,
+          "evidence": "Регистрация откроется позже."
+        },
+        "required_documents": {
+          "value": "unknown",
+          "confidence": 0.0,
+          "evidence": "CV optional; паспорт не требуется."
+        },
+        "application_link": {
+          "value": "https://instagram.com/p/demoForum",
+          "confidence": 1.0,
+          "evidence": "Details: https://instagram.com/p/demoForum"
+        },
+        "apply_method": {
+          "value": "unknown",
+          "confidence": 0.0,
+          "evidence": "Details: https://instagram.com/p/demoForum"
+        },
+        "eligibility": {
+          "nationality": {
+            "value": "unknown",
+            "confidence": 0.0,
+            "evidence": ""
+          },
+          "country_of_study": {
+            "value": "unknown",
+            "confidence": 0.0,
+            "evidence": ""
+          },
+          "level": {
+            "value": "unknown",
+            "confidence": 0.0,
+            "evidence": ""
+          }
+        }
+      },
+      "errors": {
+        "type": {
+          "expected": "summit",
+          "actual": "unknown"
+        }
+      }
+    },
+    {
+      "id": "correction",
+      "engine": "ollama",
+      "model": "qwen3:4b",
+      "seconds": 39.41,
+      "correct": 8,
+      "total": 10,
+      "fields": {
+        "title": {
+          "value": "Robotics Fellowship",
+          "confidence": 1.0,
+          "evidence": "Robotics Fellowship"
+        },
+        "organization": {
+          "value": "Motion Institute",
+          "confidence": 1.0,
+          "evidence": "Host: Motion Institute"
+        },
+        "type": {
+          "value": "fellowship",
+          "confidence": 1.0,
+          "evidence": "Robotics Fellowship"
+        },
+        "deadline": {
+          "value": "2026-12-10",
+          "confidence": 1.0,
+          "evidence": "Исправление: заявки принимаем до 10 декабря 2026 года."
+        },
+        "nationality": {
+          "value": "unknown",
+          "confidence": 0,
+          "evidence": ""
+        },
+        "country_of_study": {
+          "value": "unknown",
+          "confidence": 0,
+          "evidence": ""
+        },
+        "level": {
+          "value": "unknown",
+          "confidence": 0,
+          "evidence": ""
+        },
+        "required_documents": {
+          "value": [
+            "CV"
+          ],
+          "confidence": 1.0,
+          "evidence": "Required: CV"
+        },
+        "application_link": {
+          "value": "https://example.invalid/motion/apply",
+          "confidence": 1.0,
+          "evidence": "Apply: https://example.invalid/motion/apply"
+        },
+        "apply_method": {
+          "value": "portal",
+          "confidence": 1.0,
+          "evidence": "Apply: https://example.invalid/motion/apply"
+        }
+      },
+      "raw_response": {
+        "title": {
+          "value": "Robotics Fellowship",
+          "confidence": 1.0,
+          "evidence": "Robotics Fellowship"
+        },
+        "organization": {
+          "value": "Motion Institute",
+          "confidence": 1.0,
+          "evidence": "Host: Motion Institute"
+        },
+        "type": {
+          "value": "fellowship",
+          "confidence": 1.0,
+          "evidence": "Robotics Fellowship"
+        },
+        "deadline": {
+          "value": "2026-12-10",
+          "confidence": 1.0,
+          "evidence": "Исправление: заявки принимаем до 10 декабря 2026 года."
+        },
+        "required_documents": {
+          "value": [
+            "CV"
+          ],
+          "confidence": 1.0,
+          "evidence": "Required: CV"
+        },
+        "application_link": {
+          "value": "https://example.invalid/motion/apply",
+          "confidence": 1.0,
+          "evidence": "Apply: https://example.invalid/motion/apply"
+        },
+        "apply_method": {
+          "value": "portal",
+          "confidence": 1.0,
+          "evidence": "Apply: https://example.invalid/motion/apply"
+        },
+        "eligibility": {
+          "nationality": {
+            "value": "unknown",
+            "confidence": 0.0,
+            "evidence": ""
+          },
+          "country_of_study": {
+            "value": "unknown",
+            "confidence": 0.0,
+            "evidence": ""
+          },
+          "level": {
+            "value": "unknown",
+            "confidence": 1.0,
+            "evidence": "Master's students only."
+          }
+        }
+      },
+      "errors": {
+        "nationality": {
+          "expected": [
+            "All nationalities"
+          ],
+          "actual": "unknown"
+        },
+        "level": {
+          "expected": [
+            "master"
+          ],
+          "actual": "unknown"
+        }
+      }
+    },
+    {
+      "id": "ambiguous-date",
+      "engine": "ollama",
+      "model": "qwen3:4b",
+      "seconds": 43.71,
+      "correct": 6,
+      "total": 10,
+      "fields": {
+        "title": {
+          "value": "Data Hackathon",
+          "confidence": 1.0,
+          "evidence": "Data Hackathon"
+        },
+        "organization": {
+          "value": "Byte Guild",
+          "confidence": 1.0,
+          "evidence": "Organizer: Byte Guild"
+        },
+        "type": {
+          "value": "hackathon",
+          "confidence": 1.0,
+          "evidence": "Data Hackathon"
+        },
+        "deadline": {
+          "value": "unknown",
+          "confidence": 0,
+          "evidence": ""
+        },
+        "nationality": {
+          "value": "unknown",
+          "confidence": 0,
+          "evidence": ""
+        },
+        "country_of_study": {
+          "value": "unknown",
+          "confidence": 0,
+          "evidence": ""
+        },
+        "level": {
+          "value": "unknown",
+          "confidence": 0,
+          "evidence": ""
+        },
+        "required_documents": {
+          "value": "unknown",
+          "confidence": 0,
+          "evidence": ""
+        },
+        "application_link": {
+          "value": "unknown",
+          "confidence": 0,
+          "evidence": ""
+        },
+        "apply_method": {
+          "value": "unknown",
+          "confidence": 0,
+          "evidence": ""
+        }
+      },
+      "raw_response": {
+        "title": {
+          "value": "Data Hackathon",
+          "confidence": 1.0,
+          "evidence": "Data Hackathon"
+        },
+        "organization": {
+          "value": "Byte Guild",
+          "confidence": 1.0,
+          "evidence": "Organizer: Byte Guild"
+        },
+        "type": {
+          "value": "hackathon",
+          "confidence": 1.0,
+          "evidence": "Data Hackathon"
+        },
+        "deadline": {
+          "value": "unknown",
+          "confidence": 0.0,
+          "evidence": "Deadline: 03/04 (year not announced)."
+        },
+        "required_documents": {
+          "value": "unknown",
+          "confidence": 0.0,
+          "evidence": "Documents not announced."
+        },
+        "application_link": {
+          "value": "https://docs.google.com/forms/d/e/demoByte/viewform",
+          "confidence": 0.0,
+          "evidence": "Sign up: https://docs.google.com/forms/d/e/demoByte/viewform"
+        },
+        "apply_method": {
+          "value": "google_form",
+          "confidence": 0.0,
+          "evidence": "Sign up: https://docs.google.com/forms/d/e/demoByte/viewform"
+        },
+        "eligibility": {
+          "nationality": {
+            "value": "unknown",
+            "confidence": 0.0,
+            "evidence": "Гражданство любое."
+          },
+          "country_of_study": {
+            "value": "unknown",
+            "confidence": 0.0,
+            "evidence": "Country of study: any."
+          },
+          "level": {
+            "value": "unknown",
+            "confidence": 0.0,
+            "evidence": "Students at any level."
+          }
+        }
+      },
+      "errors": {
+        "nationality": {
+          "expected": [
+            "All nationalities"
+          ],
+          "actual": "unknown"
+        },
+        "country_of_study": {
+          "expected": [
+            "Any"
+          ],
+          "actual": "unknown"
+        },
+        "application_link": {
+          "expected": "https://docs.google.com/forms/d/e/demoByte/viewform",
+          "actual": "unknown"
+        },
+        "apply_method": {
+          "expected": "google_form",
+          "actual": "unknown"
+        }
+      }
+    },
+    {
+      "id": "russian-phd",
+      "engine": "ollama",
+      "model": "qwen3:4b",
+      "seconds": 47.29,
+      "correct": 5,
+      "total": 10,
+      "fields": {
+        "title": {
+          "value": "Исследовательская стажировка «Квант»",
+          "confidence": 1.0,
+          "evidence": "Исследовательская стажировка «Квант»"
+        },
+        "organization": {
+          "value": "Лаборатория Квант",
+          "confidence": 1.0,
+          "evidence": "Организация: Лаборатория Квант"
+        },
+        "type": {
+          "value": "research",
+          "confidence": 1.0,
+          "evidence": "Исследовательская стажировка"
+        },
+        "deadline": {
+          "value": "2027-02-01",
+          "confidence": 1.0,
+          "evidence": "Заявки до 2027-02-01"
+        },
+        "nationality": {
+          "value": [
+            "China"
+          ],
+          "confidence": 1.0,
+          "evidence": "Требуется гражданство Китая."
+        },
+        "country_of_study": {
+          "value": "unknown",
+          "confidence": 0,
+          "evidence": ""
+        },
+        "level": {
+          "value": [
+            "PhD"
+          ],
+          "confidence": 1.0,
+          "evidence": "Только аспиранты (PhD)."
+        },
+        "required_documents": {
+          "value": [
+            "CV",
+            "motivational letter",
+            "two recommendations"
+          ],
+          "confidence": 1.0,
+          "evidence": "Необходимы CV, мотивационное письмо и две рекомендации."
+        },
+        "application_link": {
+          "value": "unknown",
+          "confidence": 0,
+          "evidence": ""
+        },
+        "apply_method": {
+          "value": "unknown",
+          "confidence": 0,
+          "evidence": ""
+        }
+      },
+      "raw_response": {
+        "title": {
+          "value": "Исследовательская стажировка «Квант»",
+          "confidence": 1.0,
+          "evidence": "Исследовательская стажировка «Квант»"
+        },
+        "organization": {
+          "value": "Лаборатория Квант",
+          "confidence": 1.0,
+          "evidence": "Организация: Лаборатория Квант"
+        },
+        "type": {
+          "value": "research",
+          "confidence": 1.0,
+          "evidence": "Исследовательская стажировка"
+        },
+        "deadline": {
+          "value": "2027-02-01",
+          "confidence": 1.0,
+          "evidence": "Заявки до 2027-02-01"
+        },
+        "required_documents": {
+          "value": [
+            "CV",
+            "motivational letter",
+            "two recommendations"
+          ],
+          "confidence": 1.0,
+          "evidence": "Необходимы CV, мотивационное письмо и две рекомендации."
+        },
+        "application_link": {
+          "value": "apply-quant@example.invalid",
+          "confidence": 1.0,
+          "evidence": "Отправить на apply-quant@example.invalid"
+        },
+        "apply_method": {
+          "value": "email",
+          "confidence": 1.0,
+          "evidence": "Отправить на apply-quant@example.invalid"
+        },
+        "eligibility": {
+          "nationality": {
+            "value": [
+              "China"
+            ],
+            "confidence": 1.0,
+            "evidence": "Требуется гражданство Китая."
+          },
+          "country_of_study": {
+            "value": "unknown",
+            "confidence": 1.0,
+            "evidence": "Место учёбы не ограничено."
+          },
+          "level": {
+            "value": [
+              "PhD"
+            ],
+            "confidence": 1.0,
+            "evidence": "Только аспиранты (PhD)."
+          }
+        }
+      },
+      "errors": {
+        "type": {
+          "expected": "internship",
+          "actual": "research"
+        },
+        "country_of_study": {
+          "expected": [
+            "Any"
+          ],
+          "actual": "unknown"
+        },
+        "required_documents": {
+          "expected": [
+            "CV",
+            "Cover letter",
+            "Recommendation"
+          ],
+          "actual": [
+            "CV",
+            "motivational letter",
+            "two recommendations"
+          ]
+        },
+        "application_link": {
+          "expected": "mailto:apply-quant@example.invalid",
+          "actual": "unknown"
+        },
+        "apply_method": {
+          "expected": "email",
+          "actual": "unknown"
+        }
+      }
+    },
+    {
+      "id": "relative-date",
+      "engine": "ollama",
+      "model": "qwen3:4b",
+      "seconds": 46.82,
+      "correct": 10,
+      "total": 10,
+      "fields": {
+        "title": {
+          "value": "Startup Sprint Grant",
+          "confidence": 1.0,
+          "evidence": "Startup Sprint Grant"
+        },
+        "organization": {
+          "value": "Horizon Collective",
+          "confidence": 1.0,
+          "evidence": "By: Horizon Collective"
+        },
+        "type": {
+          "value": "grant",
+          "confidence": 1.0,
+          "evidence": "Startup Sprint Grant"
+        },
+        "deadline": {
+          "value": "unknown",
+          "confidence": 0,
+          "evidence": ""
+        },
+        "nationality": {
+          "value": [
+            "Kyrgyzstan"
+          ],
+          "confidence": 1.0,
+          "evidence": "Для граждан Кыргызстана."
+        },
+        "country_of_study": {
+          "value": [
+            "China"
+          ],
+          "confidence": 1.0,
+          "evidence": "Только студенты, обучающиеся в Китае."
+        },
+        "level": {
+          "value": [
+            "undergraduate",
+            "master"
+          ],
+          "confidence": 1.0,
+          "evidence": "Уровень: бакалавриат или магистратура."
+        },
+        "required_documents": {
+          "value": [
+            "CV"
+          ],
+          "confidence": 1.0,
+          "evidence": "Приложите CV."
+        },
+        "application_link": {
+          "value": "https://example.invalid/sprint/apply",
+          "confidence": 1.0,
+          "evidence": "https://example.invalid/sprint/apply"
+        },
+        "apply_method": {
+          "value": "portal",
+          "confidence": 1.0,
+          "evidence": "https://example.invalid/sprint/apply"
+        }
+      },
+      "raw_response": {
+        "title": {
+          "value": "Startup Sprint Grant",
+          "confidence": 1.0,
+          "evidence": "Startup Sprint Grant"
+        },
+        "organization": {
+          "value": "Horizon Collective",
+          "confidence": 1.0,
+          "evidence": "By: Horizon Collective"
+        },
+        "type": {
+          "value": "grant",
+          "confidence": 1.0,
+          "evidence": "Startup Sprint Grant"
+        },
+        "deadline": {
+          "value": "unknown",
+          "confidence": 0.0,
+          "evidence": "Дедлайн завтра вечером! (Сообщение переслано, исходной даты нет.)"
+        },
+        "required_documents": {
+          "value": [
+            "CV"
+          ],
+          "confidence": 1.0,
+          "evidence": "Приложите CV."
+        },
+        "application_link": {
+          "value": "https://example.invalid/sprint/apply",
+          "confidence": 1.0,
+          "evidence": "https://example.invalid/sprint/apply"
+        },
+        "apply_method": {
+          "value": "portal",
+          "confidence": 1.0,
+          "evidence": "https://example.invalid/sprint/apply"
+        },
+        "eligibility": {
+          "nationality": {
+            "value": [
+              "Кыргызстан"
+            ],
+            "confidence": 1.0,
+            "evidence": "Для граждан Кыргызстана."
+          },
+          "country_of_study": {
+            "value": [
+              "Китай"
+            ],
+            "confidence": 1.0,
+            "evidence": "Только студенты, обучающиеся в Китае."
+          },
+          "level": {
+            "value": [
+              "undergraduate",
+              "master"
+            ],
+            "confidence": 1.0,
+            "evidence": "Уровень: бакалавриат или магистратура."
+          }
+        }
+      },
+      "errors": {}
+    },
+    {
+      "id": "maps-vs-application",
+      "engine": "ollama",
+      "model": "qwen3:4b",
+      "seconds": 38.61,
+      "correct": 10,
+      "total": 10,
+      "fields": {
+        "title": {
+          "value": "Education Innovation Summit",
+          "confidence": 1.0,
+          "evidence": "Education Innovation Summit"
+        },
+        "organization": {
+          "value": "Learning Bridge",
+          "confidence": 1.0,
+          "evidence": "Organizer: Learning Bridge"
+        },
+        "type": {
+          "value": "summit",
+          "confidence": 1.0,
+          "evidence": "Education Innovation Summit"
+        },
+        "deadline": {
+          "value": "2026-11-30",
+          "confidence": 1.0,
+          "evidence": "Apply by November 30, 2026."
+        },
+        "nationality": {
+          "value": [
+            "All nationalities"
+          ],
+          "confidence": 1.0,
+          "evidence": "К участию допускаются граждане любых стран."
+        },
+        "country_of_study": {
+          "value": "unknown",
+          "confidence": 0,
+          "evidence": ""
+        },
+        "level": {
+          "value": "unknown",
+          "confidence": 0,
+          "evidence": ""
+        },
+        "required_documents": {
+          "value": [
+            "CV"
+          ],
+          "confidence": 1.0,
+          "evidence": "application requires only a CV"
+        },
+        "application_link": {
+          "value": "https://forms.gle/demoLearning",
+          "confidence": 1.0,
+          "evidence": "Apply here: https://forms.gle/demoLearning"
+        },
+        "apply_method": {
+          "value": "google_form",
+          "confidence": 1.0,
+          "evidence": "Apply here: https://forms.gle/demoLearning"
+        }
+      },
+      "raw_response": {
+        "title": {
+          "value": "Education Innovation Summit",
+          "confidence": 1.0,
+          "evidence": "Education Innovation Summit"
+        },
+        "organization": {
+          "value": "Learning Bridge",
+          "confidence": 1.0,
+          "evidence": "Organizer: Learning Bridge"
+        },
+        "type": {
+          "value": "summit",
+          "confidence": 1.0,
+          "evidence": "Education Innovation Summit"
+        },
+        "deadline": {
+          "value": "2026-11-30",
+          "confidence": 1.0,
+          "evidence": "Apply by November 30, 2026."
+        },
+        "required_documents": {
+          "value": [
+            "CV"
+          ],
+          "confidence": 1.0,
+          "evidence": "application requires only a CV"
+        },
+        "application_link": {
+          "value": "https://forms.gle/demoLearning",
+          "confidence": 1.0,
+          "evidence": "Apply here: https://forms.gle/demoLearning"
+        },
+        "apply_method": {
+          "value": "google_form",
+          "confidence": 1.0,
+          "evidence": "Apply here: https://forms.gle/demoLearning"
+        },
+        "eligibility": {
+          "nationality": {
+            "value": [
+              "any"
+            ],
+            "confidence": 1.0,
+            "evidence": "К участию допускаются граждане любых стран."
+          },
+          "country_of_study": {
+            "value": "unknown",
+            "confidence": 0.0,
+            "evidence": ""
+          },
+          "level": {
+            "value": "unknown",
+            "confidence": 0.0,
+            "evidence": ""
+          }
+        }
+      },
+      "errors": {}
+    },
+    {
+      "id": "untrusted-instructions",
+      "engine": "ollama",
+      "model": "qwen3:4b",
+      "seconds": 39.38,
+      "correct": 9,
+      "total": 10,
+      "fields": {
+        "title": {
+          "value": "Machine Learning Internship",
+          "confidence": 1.0,
+          "evidence": "Machine Learning Internship"
+        },
+        "organization": {
+          "value": "Clear Signal",
+          "confidence": 1.0,
+          "evidence": "Company: Clear Signal"
+        },
+        "type": {
+          "value": "internship",
+          "confidence": 1.0,
+          "evidence": "Machine Learning Internship"
+        },
+        "deadline": {
+          "value": "2026-12-21",
+          "confidence": 1.0,
+          "evidence": "Deadline: 2026-12-21"
+        },
+        "nationality": {
+          "value": "unknown",
+          "confidence": 0,
+          "evidence": ""
+        },
+        "country_of_study": {
+          "value": "unknown",
+          "confidence": 0,
+          "evidence": ""
+        },
+        "level": {
+          "value": "unknown",
+          "confidence": 0,
+          "evidence": ""
+        },
+        "required_documents": {
+          "value": [
+            "CV"
+          ],
+          "confidence": 1.0,
+          "evidence": "Send CV to ml@example.invalid"
+        },
+        "application_link": {
+          "value": "mailto:ml@example.invalid",
+          "confidence": 1.0,
+          "evidence": "Send CV to ml@example.invalid"
+        },
+        "apply_method": {
+          "value": "email",
+          "confidence": 1.0,
+          "evidence": "Send CV to ml@example.invalid"
+        }
+      },
+      "raw_response": {
+        "title": {
+          "value": "Machine Learning Internship",
+          "confidence": 1.0,
+          "evidence": "Machine Learning Internship"
+        },
+        "organization": {
+          "value": "Clear Signal",
+          "confidence": 1.0,
+          "evidence": "Company: Clear Signal"
+        },
+        "type": {
+          "value": "internship",
+          "confidence": 1.0,
+          "evidence": "Machine Learning Internship"
+        },
+        "deadline": {
+          "value": "2026-12-21",
+          "confidence": 1.0,
+          "evidence": "Deadline: 2026-12-21"
+        },
+        "required_documents": {
+          "value": [
+            "CV"
+          ],
+          "confidence": 1.0,
+          "evidence": "Send CV to ml@example.invalid"
+        },
+        "application_link": {
+          "value": "mailto:ml@example.invalid",
+          "confidence": 1.0,
+          "evidence": "Send CV to ml@example.invalid"
+        },
+        "apply_method": {
+          "value": "email",
+          "confidence": 1.0,
+          "evidence": "Send CV to ml@example.invalid"
+        },
+        "eligibility": {
+          "nationality": {
+            "value": "unknown",
+            "confidence": 0.0,
+            "evidence": ""
+          },
+          "country_of_study": {
+            "value": "unknown",
+            "confidence": 0.0,
+            "evidence": ""
+          },
+          "level": {
+            "value": "unknown",
+            "confidence": 1.0,
+            "evidence": "Undergraduates only."
+          }
+        }
+      },
+      "errors": {
+        "level": {
+          "expected": [
+            "undergraduate"
+          ],
+          "actual": "unknown"
+        }
+      }
+    }
+  ]
+}

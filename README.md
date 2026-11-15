@@ -19,11 +19,11 @@ Open http://127.0.0.1:8765. This installation's private data directory already c
 
 ## Run at macOS login
 
-This Mac uses a per-user LaunchAgent to keep the dashboard available. To install it on another Mac from the checkout directory, run `python3 -m opportunityos.service install`. Pass `--data /path/to/private/data` when using an existing database. Stop any foreground server on the same port before installing. Use `python3 -m opportunityos.service status`, `restart`, or `uninstall` to manage the service. Installation stages the runtime and optional virtual-environment packages in Application Support. Run install again from the checkout after source updates. The app still respects its discovery window and the Mac's sleep state.
+This Mac uses a per-user LaunchAgent to keep the dashboard available. To install it on another Mac from the checkout directory, run `python3 -m opportunityos.service install`. Pass `--data /path/to/private/data` when using an existing database. Stop any foreground server on the same port before installing. Use `python3 -m opportunityos.service status`, `restart`, or `uninstall` to manage the service. Installation stages the runtime and optional virtual-environment packages in Application Support. Run install again from the checkout after source updates. Discovery follows its configured interval or optional work window and pauses while the Mac sleeps.
 
 ## Optional components
 
-- **Local AI.** Start Ollama separately and configure an installed model in Settings. OpportunityOS calls its loopback API only when drafting from a question and verified facts. It falls back to an offline outline if Ollama is unavailable. Review the draft for unsupported claims and the actual word count.
+- **Local AI.** Extraction uses local Ollama by default. Drafting has a separate optional installed-model setting and uses the question and verified profile facts. Drafting falls back to an offline outline if Ollama is unavailable. Review the draft for unsupported claims and the actual word count.
 - **Browser sandbox.** With Python 3.14, create a venv and install `requirements-browser.txt`. Run `python -m opportunityos.browser --submit-test` in that environment while the dashboard is running. The adapter uses installed Chrome if available, otherwise run `python -m playwright install chromium`. This workflow uses synthetic data and is restricted to the bundled loopback form.
 - **Gmail.** Install `requirements-gmail.txt` in a venv. Enable Gmail API in Google Cloud and create a desktop OAuth client. Keep the downloaded JSON outside the repository. Create a dedicated Gmail label called OpportunityOS, then label application messages. Run `python -m opportunityos.gmail --data /absolute/path/to/private-data --authorize /path/to/client.json`. For later scans omit `--authorize`. The connector uses the metadata-only scope and Keychain through keyring, fetches subjects for the first page of the selected label, and displays inferred signals in Applications. It never changes Gmail or automatically changes application status. An HKU account can use a different `--account` label. Live OAuth requires your Google consent and remains unverified. [Google's desktop OAuth quickstart](https://developers.google.com/workspace/gmail/api/quickstart/python) · [Gmail scopes](https://developers.google.com/workspace/gmail/api/auth/scopes)
 - **ChatGPT Plus.** OpenAI documents eligible local personal apps using Sign in with ChatGPT for account-specific models and eligible streaming Responses API calls. Usage shares the Plus five-hour allowance across connected apps and can also be subject to app-specific limits and available credits. The preview supports model-dependent text, images and files, with no hosted file search, code execution, computer use or access to existing ChatGPT chats. This release uses offline/Ollama drafting and does not ship the ChatGPT OAuth adapter. [OpenAI cookbook](https://developers.openai.com/cookbook/articles/sign-in-with-chatgpt) · [Usage limits](https://developers.openai.com/siwc/token-sharing-open-source/profiles-and-sessions) · [Preview limitations](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations)
@@ -32,8 +32,8 @@ This Mac uses a per-user LaunchAgent to keep the dashboard available. To install
 
 - Python's standard library serves a loopback-only dashboard and JSON API. SQLite stores facts, discovery evidence, settings, and application history. Local documents are private file copies. The app uses owner-only data permissions, same-origin mutation checks, an asset CSP and escaped UI output. Use OS disk encryption for encrypted storage. A process already running under your macOS account is trusted by this local app.
 - The discovery adapter reads five public employer Greenhouse feeds. It deduplicates by source ID and URL, keeps removed postings for history, and excludes old snapshots from active ranking. A board's public listing is a discovery signal. Use the official portal to confirm open status and the exact requirements. [Greenhouse Job Board API](https://docs.greenhouse.io/job-board)
-- Ranking uses title-based alignment and degree clues, official-board evidence and disclosed pay text. Citizenship, age, work authorization, and many other criteria remain manual checks. Scores indicate relative priority and do not estimate acceptance odds.
-- The foreground scheduler checks every 30 seconds and defaults to Monday, Wednesday and Friday, 7–9 p.m. Hong Kong time. It runs while the server is running and the Mac is awake, with an optional AC-only setting. Missed windows defer to the next permitted window. Stop and Pause take effect between source fetches and are reset on process restart.
+- Ranking uses title and post alignment, extracted eligibility restrictions, official-board evidence and disclosed pay text. Citizenship, age, work authorization, and many other criteria remain manual checks. Scores indicate relative priority and do not estimate acceptance odds.
+- The scheduler checks every 30 minutes by default while running. The optional working window remains Monday, Wednesday and Friday, 7–9 p.m. Hong Kong time. It runs while the server is running and the Mac is awake, with an optional AC-only setting. Missed windows defer to the next permitted window. Stop and Pause take effect between source fetches and are reset on process restart.
 
 ## Tests
 
@@ -48,7 +48,7 @@ See [PROGRESS.md](PROGRESS.md) for the implementation and test record.
 
 ## Telegram and Google Form slice
 
-Settings accepts up to 20 public channel usernames. Run now fetches the latest public preview page per channel. Posts outside that rolling page remain in the evidence history. The adapters return raw posts, then a separate deterministic extractor identifies application links, deadline text, explicit eligibility restrictions and requested documents. Unsupported wording remains unknown and the raw text is available in opportunity details.
+Settings accepts up to 20 public channel usernames. Run now fetches the latest public preview page per channel. Posts outside that rolling page remain in the evidence history. The adapters return raw posts, then a separate local-model extractor identifies application links, deadlines, explicit eligibility restrictions and requested documents, with a labeled regex fallback. Unsupported wording remains unknown and the raw text is available in opportunity details.
 
 Expired deadlines are hidden from Discover, including its expanded history filter. Verified citizenship, location and academic level are compared against recognized explicit restrictions before scoring. Location currently supplies country of study as requested, so verify that it records your study location. Unrecognized restrictions still require review.
 
@@ -61,3 +61,33 @@ The service uses the workspace .venv with Homebrew Python and Playwright on this
 The repeatable real-source demonstration is `PYTHONPATH=. python tests/telegram_browser_smoke.py` with Playwright installed. It reads public opportunity_alerts posts into a disposable database and fills a real summit registration form using synthetic verified name/email values. It sends no form response. Source content and form availability can change.
 
 On this Mac, active private data is now in ~/Library/Application Support/OpportunityOS/data. The former data folder remains as a backup. The runtime is staged outside Documents because the login process stalled during interpreter initialization there.
+
+## Discovery quality
+
+Local Ollama is now the default extraction provider, using qwen3:4b. Run Ollama and install the model with `ollama pull qwen3:4b` on a new Mac. This Mac has the model installed. Settings also supports a local chat-completions server such as LM Studio at `http://127.0.0.1:1234/v1`, or explicit regex-only operation.
+
+Every extracted field has a value, model-reported confidence and a verbatim quote. Unknown or low-confidence fields stay unknown. JSON shape, quote presence, dates, destination links and several common semantic errors are checked before persistence. Confidence is uncalibrated and quotes do not independently verify a source's claims. Failed or unavailable model extraction is labeled as regex fallback. The original post is retained in the evidence drawer.
+
+Discovery checks every 30 minutes while the server is running, including its login service. Settings can restrict this to the existing working window and AC-only operation. Missed intervals coalesce into one run after wake. Pause/Stop disable automatic checks until resumed. Checks never overlap. Unchanged successful extractions are cached. The default run budget permits five new LLM extractions, prioritizing Telegram, with remaining posts shown as fallback and retried on later runs. Change the maximum new model extractions per run in Settings for a different budget.
+
+Use **Sources** or **Add source** on Today to paste a public Telegram channel URL. It is saved and fetched immediately, or queued behind the current run. Source health and the last successful check are visible. Private or unavailable channels show source failures.
+
+Use **Inbox → Paste a link or text** for Instagram/LinkedIn. Public metadata is fetched when accessible. If a platform needs authentication or blocks a preview, paste the post text with its original URL. Text-only posts work too. The same extractor and review workflow are used. Repeated submissions update the same saved post.
+
+### Telegram notifications
+
+Install requirements-notifications.txt in the service environment. In Settings, enter the bot token from @BotFather and your numeric private chat ID after starting a chat with your bot. Enable notifications to permit messages containing opportunity titles and source/application links. The bot credential is kept in macOS Keychain and never returned in dashboard state.
+
+The notifier sends newly qualifying strong matches and closing dates within 48 hours. Date-only cutoffs are explicitly labeled unverified. Notifications are deduplicated persistently across restarts and repeated source posts. Rate-limited requests are deferred. Ambiguous delivery is retained without automatic retries to avoid duplicates. Live delivery requires your own credentials and has not been tested with a real account in this implementation.
+
+### Extraction benchmark
+
+```sh
+PYTHONPATH=. .venv/bin/python tests/benchmark_extraction.py --provider ollama --model qwen3:4b
+PYTHONPATH=. .venv/bin/python tests/benchmark_extraction.py --provider regex --output outputs/extraction-regex.json
+.venv/bin/python -m unittest discover -s tests -v
+```
+
+The fixture file contains ten **synthetic**, realistic English, Russian and mixed-language posts with fixed expected labels. Scores count exact agreement across ten fields per post, including correct unknowns. The benchmark saves raw model JSON, confidence, evidence, errors and timings. This small benchmark measures these examples and does not establish real-world accuracy.
+
+Recorded results for all ten examples, including expected and extracted values, are in [the extraction accuracy report](docs/extraction-accuracy.md).

@@ -1,10 +1,12 @@
+import json
 import subprocess
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from .sources import BOARDS, refresh, source_names
+from .sources import refresh, source_names
 from .store import now
+from .notifications import notify
 
 HK = ZoneInfo("Asia/Hong_Kong")
 
@@ -29,11 +31,28 @@ class Agent:
         self.enabled = True
         self.worker = None
 
-    def start(self, scheduled=False):
+    def request_source(self, source):
+        with self.condition:
+            with self.store.db() as db:
+                row = db.execute("SELECT value FROM settings WHERE key='pending_sources'").fetchone()
+                pending = json.loads(row["value"]) if row else []
+                if source not in pending:
+                    pending.append(source)
+                db.execute("INSERT OR REPLACE INTO settings VALUES ('pending_sources', ?)", (json.dumps(pending),))
+            if not self.worker or not self.worker.is_alive():
+                try:
+                    self.start(sources=pending)
+                    return "fetching"
+                except ValueError:
+                    return "deferred"
+            return "queued"
+
+    def start(self, scheduled=False, sources=None):
         with self.condition:
             if self.worker and self.worker.is_alive():
                 if self.state == "Paused" and not scheduled:
                     self.state = "Running"
+                    self.enabled = True
                     self.condition.notify_all()
                     return
                 raise ValueError("Discovery is already active")
@@ -42,65 +61,79 @@ class Agent:
                 raise ValueError("Waiting for AC power")
             self.enabled = True
             self.state = "Running"
-            self.worker = threading.Thread(target=self.run, args=(scheduled, settings), daemon=True)
+            with self.store.db() as db:
+                db.execute("INSERT OR REPLACE INTO settings VALUES ('last_discovery_attempt', ?)", (json.dumps(now()),))
+            self.worker = threading.Thread(target=self.run, args=(scheduled, settings, sources), daemon=True)
             self.worker.start()
 
     def control(self, action):
         with self.condition:
-            if action == "stop":
-                self.enabled = False
-                self.state = "Stopping" if self.state in {"Running", "Paused"} else "Stopped"
-            elif action == "pause":
-                self.enabled = False
-                self.state = "Paused"
+            self.enabled = False
+            self.state = ("Stopping" if self.worker and self.worker.is_alive() else "Stopped") if action == "stop" else "Paused"
             self.condition.notify_all()
 
-    def run(self, scheduled, settings):
-        self.store.log("Scheduled discovery started" if scheduled else "Discovery started")
-        failed = 0
-        completed = True
+    def interrupted(self, scheduled, settings):
+        return (self.state in {"Stopping", "Stopped", "Paused"} or
+                scheduled and settings.get("discovery_schedule_mode", "always") == "window" and not permitted(settings, datetime.now(HK)) or
+                settings["ac_only"] and not on_ac())
+
+    def run(self, scheduled, settings, sources=None):
+        self.store.log("Discovery started")
+        todo = list(sources if sources is not None else ["telegram:" + c for c in settings.get("telegram_channels", [])] + settings["enabled_sources"])
+        processed = set()
+        budget = {"remaining": settings.get("extraction_batch_limit", 5)}
         try:
-            for board in list(settings["enabled_sources"]) + ["telegram:" + c for c in settings.get("telegram_channels", [])]:
-                with self.condition:
-                    while self.state == "Paused":
-                        if scheduled and not permitted(settings, datetime.now(HK)):
-                            break
-                        self.condition.wait(20)
-                    if self.state in {"Stopping", "Stopped", "Paused"} or (
-                        scheduled and not permitted(settings, datetime.now(HK))
-                    ) or (settings["ac_only"] and not on_ac()):
-                        completed = False
-                        break
+            while todo:
+                source = todo.pop(0)
+                if self.interrupted(scheduled, settings):
+                    break
+                processed.add(source)
                 try:
-                    refresh(self.store, board)
-                except (OSError, ValueError, KeyError, TypeError) as error:
-                    failed += 1
                     with self.store.db() as db:
-                        db.execute("INSERT OR REPLACE INTO health VALUES (?, ?, ?, 0)",
-                                   (board, now(), type(error).__name__))
-                    self.store.log(f"{source_names(settings).get(board, board)} · fetch unavailable ({type(error).__name__})")
-            if scheduled and completed and failed == 0:
-                with self.store.db() as db:
-                    db.execute("INSERT OR REPLACE INTO settings VALUES ('last_scheduled', json_quote(?))",
-                               (datetime.now(HK).date().isoformat(),))
+                        db.execute("INSERT OR REPLACE INTO health VALUES (?, ?, 'Fetching', 0)", (source, now()))
+                    refresh(self.store, source, budget=budget, should_stop=lambda: self.interrupted(scheduled, settings))
+                    with self.store.db() as db:
+                        db.execute("INSERT OR REPLACE INTO settings VALUES ('last_discovery_success', ?)", (json.dumps(now()),))
+                        row = db.execute("SELECT value FROM settings WHERE key='pending_sources'").fetchone()
+                        pending = json.loads(row["value"]) if row else []
+                        db.execute("INSERT OR REPLACE INTO settings VALUES ('pending_sources', ?)",
+                                   (json.dumps([p for p in pending if p != source]),))
+                except InterruptedError:
+                    self.store.log("Discovery deferred between posts")
+                    break
+                except (OSError, ValueError, KeyError, TypeError) as error:
+                    with self.store.db() as db:
+                        db.execute("INSERT OR REPLACE INTO health VALUES (?, ?, ?, 0)", (source, now(), type(error).__name__))
+                    self.store.log(f"{source_names(settings).get(source, source)} · unavailable ({type(error).__name__})")
+                pending = self.store.settings().get("pending_sources", [])
+                todo.extend(p for p in pending if p not in processed and p not in todo)
+            if not self.interrupted(scheduled, settings):
+                notify(self.store, should_stop=lambda: self.interrupted(scheduled, settings))
         finally:
             with self.condition:
-                if self.state == "Stopping":
-                    self.state = "Stopped"
-                elif self.state != "Paused":
-                    self.state = "Idle"
-            self.store.log("Discovery finished" if completed else "Discovery deferred at source boundary")
+                self.state = "Stopped" if self.state == "Stopping" else "Paused" if self.state == "Paused" else "Idle"
+            self.store.log("Discovery finished")
 
     def tick(self, moment):
         settings = self.store.settings()
-        if not self.enabled or self.state != "Idle" or not permitted(settings, moment):
+        if not self.enabled or self.state != "Idle":
             return
-        today = moment.date().isoformat()
-        if settings.get("last_scheduled") == today or getattr(self, "attempted", None) == today:
+        if settings.get("discovery_schedule_mode", "always") == "window" and not permitted(settings, moment):
+            return
+        with self.store.db() as db:
+            queued = [row["source"] for row in db.execute("SELECT source FROM health WHERE status='Queued'")]
+        queued = list(dict.fromkeys(settings.get("pending_sources", []) + queued))
+        if queued:
+            try:
+                self.start(sources=queued)
+            except ValueError:
+                pass
+            return
+        previous = settings.get("last_discovery_attempt")
+        if previous and moment.astimezone(timezone.utc) - datetime.fromisoformat(previous) < timedelta(minutes=settings.get("discovery_interval_minutes", 30)):
             return
         try:
             self.start(scheduled=True)
-            self.attempted = today
         except ValueError:
             pass
 

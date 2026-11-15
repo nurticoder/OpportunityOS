@@ -5,7 +5,6 @@ from html.parser import HTMLParser
 from urllib.parse import urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
-from ..store import now
 
 BOARDS = {"waymo": "Waymo", "figma": "Figma", "cloudflare": "Cloudflare",
           "databricks": "Databricks", "scaleai": "Scale AI"}

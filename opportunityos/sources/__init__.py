@@ -1,8 +1,5 @@
-import json
-
 from .greenhouse import BOARDS, inspect_form
 from . import greenhouse, telegram
-from ..extraction import extract
 from ..store import now
 
 
@@ -11,25 +8,21 @@ def source_names(settings):
                         for c in settings.get("telegram_channels", [])}}
 
 
-def refresh(store, source, adapter=None):
+def refresh(store, source, adapter=None, budget=None, should_stop=None):
+    from ..ingestion import ingest_posts
     if adapter is not None:
         data, evidence = adapter(source)
         posts = [dict(item, raw_text=item["description"], source_link=item["url"],
                       application_link=item["url"]) for item in greenhouse.normalize(source, data, evidence)]
     else:
         posts = telegram.fetch(source.split(":", 1)[1]) if source.startswith("telegram:") else greenhouse.fetch(source)
-    listings = [extract(post) for post in posts]
+    seen = ingest_posts(store, source, posts, budget, should_stop)
     stamp = now()
     with store.db() as db:
-        # Telegram previews are rolling windows. Older messages remain valid evidence.
+        # Only complete board snapshots can delist jobs. Telegram previews are rolling windows.
         if not source.startswith("telegram:"):
             db.execute("UPDATE opportunities SET state='Unlisted' WHERE source=?", (source,))
-        for item in listings:
-            db.execute("""
-                INSERT INTO opportunities VALUES (?, ?, ?, ?, ?, ?, 'Listed')
-                ON CONFLICT(id) DO UPDATE SET payload=excluded.payload,
-                    checked=excluded.checked, state='Listed'
-            """, (item["id"], source, item["source_link"], json.dumps(item), stamp, stamp))
-        db.execute("INSERT OR REPLACE INTO health VALUES (?, ?, 'OK', ?)", (source, stamp, len(listings)))
-    store.log(f"{source} · {len(listings)} posts extracted")
-    return len(listings)
+            db.executemany("UPDATE opportunities SET state='Listed' WHERE id=?", [(ident,) for ident in seen])
+        db.execute("INSERT OR REPLACE INTO health VALUES (?, ?, 'OK', ?)", (source, stamp, len(seen)))
+    store.log(f"{source} · {len(seen)} posts checked")
+    return len(seen)

@@ -23,5 +23,14 @@
     "scaleai"
   ],
   "telegram_channels": [],
-  "source_allowlist": []
+  "source_allowlist": [],
+  "extraction_provider": "ollama",
+  "extraction_model": "qwen3:4b",
+  "extraction_endpoint": "http://127.0.0.1:11434",
+  "extraction_threshold": 0.8,
+  "extraction_batch_limit": 5,
+  "discovery_interval_minutes": 30,
+  "discovery_schedule_mode": "always",
+  "telegram_notifications": false,
+  "notification_min_score": 60
 }

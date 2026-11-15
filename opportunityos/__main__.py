@@ -15,6 +15,9 @@ from .agent import Agent
 from .sources import BOARDS, inspect_form, source_names
 from .sources.telegram import channel_name
 from .extraction import expired
+from .ingestion import ingest_posts
+from .social_inbox import prepare_post
+from .notifications import save_token
 from .google_forms import FormReviews
 from .evaluation import evaluate
 from .store import DEFAULTS, Store, now
@@ -22,6 +25,14 @@ from .workflow import prepare, transition
 
 STATIC = Path(__file__).with_name("static")
 MAX_BODY = 14_100_000
+
+
+def last_checked(store):
+    with store.db() as db:
+        row = db.execute("SELECT value FROM settings WHERE key='last_discovery_success'").fetchone()
+        if row:
+            return json.loads(row["value"])
+        return db.execute("SELECT MAX(checked) FROM health WHERE status='OK'").fetchone()[0]
 
 
 def snapshot(store, agent):
@@ -46,6 +57,7 @@ def snapshot(store, agent):
             del app["payload"]
         return {"items": sorted(items, key=lambda item: (-item["score"], item["title"])),
                 "facts": facts, "apps": apps, "agent": agent.state, "settings": settings,
+                "last_checked": last_checked(store),
                 "sources": source_names(settings), "health": [dict(r) for r in db.execute("SELECT * FROM health")],
                 "documents": [dict(r) for r in db.execute("SELECT * FROM documents ORDER BY added DESC")],
                 "mail": [dict(r) for r in db.execute("SELECT kind, subject, at FROM mail_events WHERE kind NOT IN ('Archived', 'Unclassified') ORDER BY rowid DESC LIMIT 20")],
@@ -69,7 +81,26 @@ def update_settings(store, body):
     known = set(BOARDS) | {"telegram:" + c for c in channels}
     if not set(allowlist) <= known:
         raise ValueError("Allow-list entries must be enabled sources or configured Telegram channels")
-    values = {"telegram_channels": channels, "source_allowlist": allowlist, "start": start, "end": end, "days": days, "enabled_sources": sources,
+    current_settings = store.settings()
+    provider = body.get("extraction_provider", current_settings.get("extraction_provider", "ollama"))
+    if provider not in {"ollama", "local_chat", "regex"}:
+        raise ValueError("Choose a supported extraction provider")
+    interval = int(body.get("discovery_interval_minutes", current_settings.get("discovery_interval_minutes", 30)))
+    batch_limit = int(body.get("extraction_batch_limit", current_settings.get("extraction_batch_limit", 5)))
+    threshold = float(body.get("extraction_threshold", current_settings.get("extraction_threshold", .8)))
+    model = str(body.get("extraction_model", current_settings.get("extraction_model", "qwen3:4b"))).strip()
+    endpoint = str(body.get("extraction_endpoint", current_settings.get("extraction_endpoint", "http://127.0.0.1:11434"))).strip()
+    parsed = urlsplit(endpoint)
+    if (not 5 <= interval <= 1440 or not 1 <= batch_limit <= 20 or not .5 <= threshold <= 1 or not model or len(model)>100 or
+            parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost", "::1"} or
+            parsed.username or parsed.password or parsed.query or parsed.fragment):
+        raise ValueError("Check interval, confidence threshold and the local provider endpoint")
+    schedule_mode = body.get("discovery_schedule_mode", current_settings.get("discovery_schedule_mode", "always"))
+    if schedule_mode not in {"always", "window"}:
+        raise ValueError("Choose an operating schedule")
+    values = {"extraction_batch_limit": batch_limit, "extraction_provider": provider, "extraction_model": model, "extraction_endpoint": endpoint,
+              "extraction_threshold": threshold, "discovery_interval_minutes": interval, "discovery_schedule_mode": schedule_mode,
+              "telegram_channels": channels, "source_allowlist": allowlist, "start": start, "end": end, "days": days, "enabled_sources": sources,
               "weights": weights, "ac_only": body["ac_only"] is True,
               "essay_style": str(body["essay_style"])[:2000],
               "ollama_model": str(body["ollama_model"]).strip()[:100]}
@@ -144,7 +175,7 @@ def handler_for(store, agent, port):
             if path == "/api/heartbeat":
                 with store.db() as db:
                     revision = db.execute("SELECT COALESCE(MAX(rowid), 0) FROM activity").fetchone()[0]
-                return self.json({"agent": agent.state, "revision": revision})
+                return self.json({"agent": agent.state, "revision": revision, "last_checked": last_checked(store)})
             assets = {"/": ("index.html", "text/html"), "/style.css": ("style.css", "text/css"),
                       "/app.js": ("app.js", "text/javascript"), "/sandbox": ("sandbox.html", "text/html"),
                       "/sandbox.js": ("sandbox.js", "text/javascript")}
@@ -165,6 +196,42 @@ def handler_for(store, agent, port):
                 if not isinstance(body, dict):
                     raise ValueError("Invalid request")
                 path = urlsplit(self.path).path
+                if path == "/api/sources/add":
+                    channel = channel_name(body["channel"])
+                    with store.db() as db:
+                        db.execute("BEGIN IMMEDIATE")
+                        row = db.execute("SELECT value FROM settings WHERE key='telegram_channels'").fetchone()
+                        channels = json.loads(row["value"]) if row else []
+                        channel = next((c for c in channels if c.casefold() == channel.casefold()), channel)
+                        if channel not in channels:
+                            if len(channels) >= 20:
+                                raise ValueError("Up to 20 public channels are supported")
+                            channels.append(channel)
+                        db.execute("INSERT OR REPLACE INTO settings VALUES ('telegram_channels', ?)", (json.dumps(channels),))
+                        db.execute("INSERT OR REPLACE INTO health VALUES (?, ?, 'Queued', 0)", ("telegram:" + channel, now()))
+                    status = agent.request_source("telegram:" + channel)
+                    store.log("Public channel added to discovery")
+                    return self.json({"channel": channel, "status": status})
+                if path == "/api/inbox/paste":
+                    raw = prepare_post(body["content"], str(body.get("source_link", "")).strip())
+                    ingest_posts(store, "manual", [raw])
+                    store.log("Pasted post extracted")
+                    return self.json({"id": raw["id"]})
+                if path == "/api/telegram":
+                    chat = str(body.get("chat_id", "")).strip()
+                    enabled = body.get("enabled") is True
+                    if enabled and (not chat.isdecimal() or int(chat) <= 0):
+                        raise ValueError("Enter your numeric private Telegram chat ID")
+                    if body.get("token"):
+                        save_token(str(body["token"]).strip())
+                        with store.db() as db:
+                            db.execute("INSERT OR REPLACE INTO settings VALUES ('telegram_configured', 'true')")
+                    if enabled and not store.settings().get("telegram_configured"):
+                        raise ValueError("Enter a Telegram bot token first")
+                    with store.db() as db:
+                        db.executemany("INSERT OR REPLACE INTO settings VALUES (?, ?)",
+                            [("telegram_chat_id", json.dumps(chat)), ("telegram_notifications", json.dumps(enabled))])
+                    return self.json({"ok": True})
                 if path == "/api/review-close":
                     with reviews.lock:
                         if body["id"] not in reviews.jobs:

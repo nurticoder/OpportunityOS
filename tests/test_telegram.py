@@ -19,7 +19,7 @@ class TelegramSlice(unittest.TestCase):
         parser.feed('<div data-post="publicchannel/42"><div class="tgme_widget_message_text"><b>Internship</b><br>Apply <a href="https://forms.gle/abc">here</a></div><a>99 views</a><time datetime="2026-11-15"></time></div>')
         post = parser.posts[0]
         self.assertEqual(post["raw_text"], "Internship\nApply here")
-        item = extract(post)
+        item = extract(post, {"extraction_provider": "regex"})
         self.assertEqual(item["apply_method"], "google_form")
         self.assertEqual(item["evidence"], "https://t.me/publicchannel/42")
         self.assertEqual(item["application_link"], "https://forms.gle/abc")
@@ -28,7 +28,7 @@ class TelegramSlice(unittest.TestCase):
     def test_extract_and_hard_filter_before_scoring(self):
         raw = {"id": "telegram:channel/1", "source_link": "https://t.me/channel/1",
                "raw_text": "AI Internship\nOrganization: Example\nDeadline: 3 December 2026\nNationality: India\nCountry of study: Hong Kong\nLevel: Undergraduate\nCV required\nhttps://forms.gle/abc"}
-        item = extract(raw)
+        item = extract(raw, {"extraction_provider": "regex"})
         self.assertEqual(item["deadline"], "2026-12-03")
         self.assertEqual(item["required_documents"], ["CV"])
         with tempfile.TemporaryDirectory() as d:
@@ -41,7 +41,7 @@ class TelegramSlice(unittest.TestCase):
 
     def test_unknowns_and_expiry(self):
         item = extract({"raw_text": "Deadline: 10 Nov\nNationality: excellent applicants from all regions",
-                        "source_link": "https://t.me/channel/2"})
+                        "source_link": "https://t.me/channel/2"}, {"extraction_provider": "regex"})
         self.assertIsNone(item["deadline"])
         self.assertFalse(expired(item))
         self.assertTrue(expired({"deadline": "2020-01-01"}))
