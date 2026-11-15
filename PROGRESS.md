@@ -40,3 +40,17 @@
 - The legacy blocker function remains byte-for-byte in workflow.py as requested. The new Google Form path does not use it, and cannot submit. Per-submission approvals, Gmail CV drafting and the UI redesign are deferred beyond this first slice.
 
 - Repaired login startup by staging the runtime and copying the existing private database/documents to ~/Library/Application Support/OpportunityOS/data. The original data folder remains as a backup. Confirmed the heartbeat and live service snapshot after installation.
+
+## Evidence-based discovery — November 16, 2026
+
+- Kept store.py, workflow.py and the profile/facts system unchanged.
+- Added strict-schema local LLM extraction, per-field model confidence and verbatim evidence. Qwen3:4b is installed and configured as the default. Ollama and local chat-completions providers are configurable. Regex is the labeled fallback. Unknown/unsupported fields remain unknown. New inference is budgeted and successful unchanged extractions are cached.
+- Added Sources with immediate/queued Telegram fetching and an Instagram/LinkedIn link/text paste inbox. Browser-tested a live public channel and a Russian pasted test post through local Ollama, including evidence highlighting.
+- Discovery now defaults to 30-minute checks while the server is running, with no overlapping runs. Working-window and AC-only modes remain configurable. Last-successful-check indicators are visible globally and source health remains visible. Queue state and attempt timestamps survive restarts.
+- Added opt-in Telegram bot notification code for new strong matches and deadlines within 48 hours, persistent deduplication, rate-limit deferral and conservative handling of ambiguous delivery. Bot tokens are stored through macOS Keychain. Real bot delivery remains untested pending the user's bot token and private chat ID.
+- 29 automated tests passed. They cover extraction evidence, unknowns, schema failure/offline fallback, caching, source add/dedup, local provider protocol, cadence, notifications and existing workflows.
+- Ten fixed-label synthetic multilingual posts were benchmarked on local Qwen3:4b. Final exact agreement was 84/100 fields versus 59/100 for regex. Among populated model fields, 67/70 matched exactly. All 17 gold unknown fields stayed unknown. This small synthetic benchmark is not a real-world accuracy estimate. Results and raw model JSON are recorded in tests/fixtures/benchmark-results.json, with a runnable benchmark command in README.
+- Remaining quality limits include abstention on some clear requirements, document naming differences, and a weak Russian PhD case (5/10 exact). Confidence is model-reported and uncalibrated. Posts are source evidence, not independent eligibility verification. Date-only deadlines have unverified cutoff times. Blocked social previews require pasted text.
+
+- Verified a genuine live Telegram post through Qwen3:4b and the shared ingestion path, persisted with model provenance. The measured standalone extraction took 89.5 seconds; the provider timeout is 180 seconds. A bounded one-model-call source refresh checked 20 real posts. The updated runtime is staged in the macOS login service. No synthetic benchmark posts were inserted into the personal database.
+- Restart recovery resumes persisted source requests even when an interrupted fetch left its health status as Fetching.

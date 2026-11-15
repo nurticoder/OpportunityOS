@@ -23,6 +23,8 @@ class Core(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.store = Store(self.temp.name)
+        with self.store.db() as db:
+            db.execute("INSERT INTO settings VALUES ('extraction_provider', '\"regex\"')")
         self.agent = Agent(self.store)
 
     def ingest(self, items=ITEM):
@@ -101,7 +103,7 @@ class Core(unittest.TestCase):
         from threading import Event
 
         entered, release = Event(), Event()
-        def blocking_fetch(store, board):
+        def blocking_fetch(store, board, **kwargs):
             entered.set()
             release.wait(3)
 
