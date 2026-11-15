@@ -5,7 +5,7 @@ from html.parser import HTMLParser
 from urllib.parse import urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
-from .store import now
+from ..store import now
 
 BOARDS = {"waymo": "Waymo", "figma": "Figma", "cloudflare": "Cloudflare",
           "databricks": "Databricks", "scaleai": "Scale AI"}
@@ -63,23 +63,6 @@ def normalize(board, data, evidence):
         }
 
 
-def refresh(store, board, adapter=greenhouse):
-    data, evidence = adapter(board)
-    listings = list(normalize(board, data, evidence))
-    checked = now()
-    with store.db() as db:
-        db.execute("UPDATE opportunities SET state='Unlisted' WHERE source=?", (board,))
-        for item in listings:
-            db.execute("""
-                INSERT INTO opportunities VALUES (?, ?, ?, ?, ?, ?, 'Listed')
-                ON CONFLICT DO UPDATE SET payload=excluded.payload,
-                    checked=excluded.checked, state='Listed'
-            """, (item["id"], board, item["url"], json.dumps(item), checked, checked))
-        db.execute("INSERT OR REPLACE INTO health VALUES (?, ?, 'OK', ?)", (board, checked, len(listings)))
-    store.log(f"{BOARDS[board]} · {len(listings)} early-career listings checked")
-    return len(listings)
-
-
 def inspect_form(ident):
     """Read question metadata from the employer's public listing API."""
     provider, board, job = ident.split(":")
@@ -101,3 +84,10 @@ def inspect_form(ident):
                            "types": [field.get("type") for field in question.get("fields", [])],
                            "group": group})
     return result
+
+
+def fetch(board):
+    data, evidence = greenhouse(board)
+    return [dict(item, raw_text=item["description"], source_link=item["url"],
+                 application_link=item["url"], source=board)
+            for item in normalize(board, data, evidence)]

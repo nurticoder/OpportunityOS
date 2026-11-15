@@ -12,7 +12,10 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from .agent import Agent
-from .discovery import BOARDS, inspect_form
+from .sources import BOARDS, inspect_form, source_names
+from .sources.telegram import channel_name
+from .extraction import expired
+from .google_forms import FormReviews
 from .evaluation import evaluate
 from .store import DEFAULTS, Store, now
 from .workflow import prepare, transition
@@ -29,10 +32,13 @@ def snapshot(store, agent):
         items = []
         for row in db.execute("SELECT * FROM opportunities"):
             item = {**json.loads(row["payload"]), "id": row["id"], "checked": row["checked"],
-                    "state": row["state"], "discovered": row["discovered"]}
+                    "state": row["state"], "discovered": row["discovered"], "source": row["source"]}
             if item["state"] == "Listed" and item["checked"] < stale_before:
                 item["state"] = "Needs refresh"
             item.update(evaluate(item, facts, settings["weights"]))
+            if expired(item):
+                item["state"] = "Expired"
+            item["choice"] = settings.get("choice:" + item["id"], "review")
             items.append(item)
         apps = [dict(row) | json.loads(row["payload"])
                 for row in db.execute("SELECT * FROM applications ORDER BY updated DESC")]
@@ -40,7 +46,7 @@ def snapshot(store, agent):
             del app["payload"]
         return {"items": sorted(items, key=lambda item: (-item["score"], item["title"])),
                 "facts": facts, "apps": apps, "agent": agent.state, "settings": settings,
-                "sources": BOARDS, "health": [dict(r) for r in db.execute("SELECT * FROM health")],
+                "sources": source_names(settings), "health": [dict(r) for r in db.execute("SELECT * FROM health")],
                 "documents": [dict(r) for r in db.execute("SELECT * FROM documents ORDER BY added DESC")],
                 "mail": [dict(r) for r in db.execute("SELECT kind, subject, at FROM mail_events WHERE kind NOT IN ('Archived', 'Unclassified') ORDER BY rowid DESC LIMIT 20")],
                 "revision": db.execute("SELECT COALESCE(MAX(rowid), 0) FROM activity").fetchone()[0],
@@ -52,11 +58,18 @@ def update_settings(store, body):
     if not all(re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", v) for v in (start, end)) or start >= end:
         raise ValueError("Choose a start time earlier than the end time")
     days, sources, weights = body["days"], body["enabled_sources"], body["weights"]
-    if (not days or not set(days) <= set(range(7)) or not sources or not set(sources) <= set(BOARDS)
+    if (not days or not set(days) <= set(range(7)) or not set(sources) <= set(BOARDS)
             or set(weights) != set(DEFAULTS["weights"]) or not sum(weights.values())
             or not all(type(v) is int and 0 <= v <= 100 for v in weights.values())):
         raise ValueError("Check days, source selection and scoring weights")
-    values = {"start": start, "end": end, "days": days, "enabled_sources": sources,
+    channels = list(dict.fromkeys(channel_name(c) for c in str(body.get("telegram_channels", "")).split() if c))
+    if len(channels) > 20:
+        raise ValueError("Choose up to 20 public channels")
+    allowlist = list(dict.fromkeys(str(body.get("source_allowlist", "")).split()))
+    known = set(BOARDS) | {"telegram:" + c for c in channels}
+    if not set(allowlist) <= known:
+        raise ValueError("Allow-list entries must be enabled sources or configured Telegram channels")
+    values = {"telegram_channels": channels, "source_allowlist": allowlist, "start": start, "end": end, "days": days, "enabled_sources": sources,
               "weights": weights, "ac_only": body["ac_only"] is True,
               "essay_style": str(body["essay_style"])[:2000],
               "ollama_model": str(body["ollama_model"]).strip()[:100]}
@@ -90,6 +103,7 @@ def import_document(store, body):
 
 def handler_for(store, agent, port):
     authority = f"127.0.0.1:{port}"
+    reviews = FormReviews(store)
 
     class Handler(BaseHTTPRequestHandler):
         def log_request(self, code="-", size="-"):
@@ -114,6 +128,17 @@ def handler_for(store, agent, port):
             if self.headers.get("Host") != authority:
                 return self.json({"error": "Use the printed localhost address"}, 403)
             path = urlsplit(self.path).path
+            if path.startswith("/api/review/"):
+                ident = path.rsplit("/", 1)[-1]
+                if not re.fullmatch(r"[a-f0-9]{32}", ident):
+                    return self.json({"error": "Invalid review"}, 400)
+                image = store.directory / "reviews" / (ident + ".png")
+                if image.is_file():
+                    return self.send(image.read_bytes(), "image/png")
+                return self.json({"error": "Review image unavailable"}, 404)
+            if path == "/api/reviews":
+                with reviews.lock:
+                    return self.json({"reviews": list(reviews.jobs.values())})
             if path == "/api/state":
                 return self.json(snapshot(store, agent))
             if path == "/api/heartbeat":
@@ -140,6 +165,17 @@ def handler_for(store, agent, port):
                 if not isinstance(body, dict):
                     raise ValueError("Invalid request")
                 path = urlsplit(self.path).path
+                if path == "/api/review-close":
+                    with reviews.lock:
+                        if body["id"] not in reviews.jobs:
+                            raise ValueError("Review unavailable")
+                        reviews.cancelled.add(body["id"])
+                    return self.json({"ok": True})
+                if path == "/api/prefill":
+                    item = next((i for i in snapshot(store, agent)["items"] if i["id"] == body["id"]), None)
+                    if not item or item["state"] != "Listed" or item["eligibility"] == "Ineligible" or item["choice"] == "skip":
+                        raise ValueError("Choose a current eligible opportunity")
+                    return self.json({"review": reviews.start(item, store.facts())})
                 if path == "/api/form":
                     return self.json({"questions": inspect_form(body["id"])})
                 self.mutate(path, body)
@@ -176,6 +212,15 @@ def handler_for(store, agent, port):
                 if not 1 <= words <= 1200:
                     raise ValueError("Word limit must be between 1 and 1200")
                 prepare(store, item, prompt, words)
+            elif path == "/api/choice":
+                if body["choice"] not in {"auto", "review", "skip"}:
+                    raise ValueError("Invalid application choice")
+                with store.db() as db:
+                    if not db.execute("SELECT 1 FROM opportunities WHERE id=?", (body["id"],)).fetchone():
+                        raise ValueError("Opportunity unavailable")
+                    db.execute("INSERT OR REPLACE INTO settings VALUES (?, ?)",
+                               ("choice:" + body["id"], json.dumps(body["choice"])))
+                store.log("Application preference saved")
             elif path == "/api/application":
                 transition(store, body["id"], body["action"], body)
             elif path == "/api/settings":
