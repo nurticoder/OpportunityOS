@@ -4,6 +4,8 @@ import os
 import plistlib
 import subprocess
 import sys
+import sysconfig
+import shutil
 from pathlib import Path
 
 from .store import ROOT, Store
@@ -20,13 +22,19 @@ def launchctl(*args, check=True, quiet=False):
 
 def install(plist, domain, target, directory, port):
     store = Store(directory)
+    runtime = Path.home() / "Library" / "Application Support" / "OpportunityOS" / "runtime"
+    runtime.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if ROOT.resolve() != runtime.resolve():
+        shutil.copytree(ROOT / "opportunityos", runtime / "opportunityos", dirs_exist_ok=True,
+                        ignore=shutil.ignore_patterns("__pycache__"))
+        shutil.copy2(ROOT / "config.example.json", runtime / "config.example.json")
     logs = store.directory / "logs"
     logs.mkdir(exist_ok=True, mode=0o700)
     spec = {
         "Label": LABEL,
-        "ProgramArguments": [sys.executable, "-m", "opportunityos", "--data",
+        "ProgramArguments": [getattr(sys, "_base_executable", sys.executable), "-m", "opportunityos", "--data",
                              str(store.directory), "--port", str(port)],
-        "WorkingDirectory": str(ROOT),
+        "WorkingDirectory": str(runtime),
         "RunAtLoad": True,
         "KeepAlive": True,
         "ThrottleInterval": 15,
@@ -34,6 +42,11 @@ def install(plist, domain, target, directory, port):
         "StandardOutPath": str(logs / "service.log"),
         "StandardErrorPath": str(logs / "service-error.log"),
     }
+    if sys.prefix != sys.base_prefix:
+        dependencies = runtime / "dependencies"
+        shutil.copytree(sysconfig.get_path("purelib"), dependencies, dirs_exist_ok=True)
+    if (runtime / "dependencies").exists():
+        spec["EnvironmentVariables"] = {"PYTHONPATH": str(runtime / "dependencies")}
     previous = plist.read_bytes() if plist.is_file() else None
     plist.parent.mkdir(parents=True, exist_ok=True)
     temporary = plist.with_suffix(".tmp")
@@ -59,7 +72,7 @@ def main():
     os.umask(0o077)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("install", "status", "restart", "uninstall"))
-    parser.add_argument("--data", default="~/Library/Application Support/OpportunityOS")
+    parser.add_argument("--data", default="~/Library/Application Support/OpportunityOS/data")
     parser.add_argument("--port", type=int, default=8765)
     args = parser.parse_args()
     if sys.platform != "darwin":

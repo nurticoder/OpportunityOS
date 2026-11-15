@@ -38,3 +38,5 @@
 - 14 backend tests passed, including nationality rejection before scoring and allow-list denial. The live Chrome end-to-end test passed. Node syntax validation passed.
 - The Google adapter handles visible recognized text fields on the first page. Uploaded documents, radio choices, subjective answers, login and multi-page progression require manual handling. Raw claims are evidence, not independent verification. Unsupported deadline/eligibility wording stays unknown.
 - The legacy blocker function remains byte-for-byte in workflow.py as requested. The new Google Form path does not use it, and cannot submit. Per-submission approvals, Gmail CV drafting and the UI redesign are deferred beyond this first slice.
+
+- Repaired login startup by staging the runtime and copying the existing private database/documents to ~/Library/Application Support/OpportunityOS/data. The original data folder remains as a backup. Confirmed the heartbeat and live service snapshot after installation.

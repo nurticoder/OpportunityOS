@@ -19,7 +19,7 @@ Open http://127.0.0.1:8765. This installation's private data directory already c
 
 ## Run at macOS login
 
-This Mac uses a per-user LaunchAgent to keep the dashboard available. To install it on another Mac from the checkout directory, run `python3 -m opportunityos.service install`. Pass `--data /path/to/private/data` when using an existing database. Stop any foreground server on the same port before installing. Use `python3 -m opportunityos.service status`, `restart`, or `uninstall` to manage the service. Keep the checkout at its installed location, or reinstall the service after moving it. The app still respects its discovery window and the Mac's sleep state.
+This Mac uses a per-user LaunchAgent to keep the dashboard available. To install it on another Mac from the checkout directory, run `python3 -m opportunityos.service install`. Pass `--data /path/to/private/data` when using an existing database. Stop any foreground server on the same port before installing. Use `python3 -m opportunityos.service status`, `restart`, or `uninstall` to manage the service. Installation stages the runtime and optional virtual-environment packages in Application Support. Run install again from the checkout after source updates. The app still respects its discovery window and the Mac's sleep state.
 
 ## Optional components
 
@@ -56,6 +56,8 @@ Each opportunity has Apply automatically, Review first and Skip preferences. In 
 
 To prefill, put a source such as `telegram:opportunity_alerts` in the form allow-list. Verify the desired facts and allow sharing of them in Profile. Open a Google Form opportunity and click Prefill. Only recognized text/email fields are mapped, leaving choices, uploads, essays, multi-page navigation and declarations for manual review. Every browser write request is blocked. The filled browser stays visible for up to ten minutes, and a local screenshot and field report remain available in the review output. Closing and reopening the original URL starts a fresh form.
 
-The service uses the existing Python Playwright environment on this Mac. Other installations need requirements-browser.txt and Chrome or a Playwright Chromium installation. Authentication-required and closed forms return an attention message.
+The service uses the workspace .venv with Homebrew Python and Playwright on this Mac. Prepared forms are also accessible in Review Center. Other installations need requirements-browser.txt and Chrome or a Playwright Chromium installation. Authentication-required and closed forms return an attention message.
 
 The repeatable real-source demonstration is `PYTHONPATH=. python tests/telegram_browser_smoke.py` with Playwright installed. It reads public opportunity_alerts posts into a disposable database and fills a real summit registration form using synthetic verified name/email values. It sends no form response. Source content and form availability can change.
+
+On this Mac, active private data is now in ~/Library/Application Support/OpportunityOS/data. The former data folder remains as a backup. The runtime is staged outside Documents because the login process stalled during interpreter initialization there.

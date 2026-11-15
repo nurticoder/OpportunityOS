@@ -51,6 +51,10 @@ def main():
                 import shutil
                 shutil.copyfile(store.directory/"reviews"/(ident+".png"),"outputs/form-review-demo.png")
                 page.get_by_role("button",name="Close prepared browser").click()
+                page.get_by_role("button", name="Close", exact=True).click()
+                page.get_by_role("button", name="Review Center", exact=False).first.click()
+                page.get_by_role("button", name="Open form review").click()
+                expect(page.get_by_role("heading",name="Form prepared · review required")).to_be_visible()
                 print(f"PASS: {count} live posts → extracted dashboard → real Google Form, synthetic name/email filled, review shown; no submission")
                 browser.close()
         finally:

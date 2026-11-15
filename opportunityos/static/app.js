@@ -106,6 +106,7 @@ function apps(onlyReview) {
   const items = onlyReview ? review() : data.apps.filter(a=>a.status!=="Archived");
   const archived = data.apps.filter(a=>a.status==="Archived");
   return heading(onlyReview?"Review Center":"Applications",onlyReview?"Check claims, requirements and word limits before marking a draft ready.":"Track prepared applications and record confirmed outcomes.") +
+    (onlyReview ? '<div id="form-reviews"></div>' : "") +
     (items.length ? '<div class="stack">'+items.map(application).join("")+'</div>' : empty(onlyReview?"No drafts awaiting review.":"No active applications.")) +
     (!onlyReview && data.mail.length ? '<div class="section"><h2>Gmail signals</h2></div><div class="stack">'+
       data.mail.map(m=>'<div class="box"><span class="chip">'+esc(m.kind)+'</span> '+esc(m.subject)+'</div>').join("")+'</div>' : "") +
@@ -141,6 +142,7 @@ function render() {
       '<div class="row">'+data.health.map(h=>'<span class="chip">'+esc(data.sources[h.source]+" · "+h.status+" · "+h.count)+'</span>').join("")+
       '</div><div class="section"><h2>Run history</h2></div>'+activity(data.activity),"Settings":settings})[page]();
   if (page==="Discover") listings();
+  if (page==="Review Center") loadFormReviews();
   for (const el of document.querySelectorAll("[data-app]")) el.open=openApps.includes(el.dataset.app);
 }
 document.addEventListener("click", async e => {
@@ -151,6 +153,10 @@ document.addEventListener("click", async e => {
       $("#detail").close();
       page=b.dataset.nav; await load(); render(); window.scrollTo(0,0);
     } else if (b.dataset.detail) showDetail(b.dataset.detail);
+    else if (b.dataset.formReview) {
+      showDetail(b.dataset.opportunity);
+      watchReview(b.dataset.formReview);
+    }
     else if (b.dataset.closeReview) {
       await mutate("review-close",{id:b.dataset.closeReview},"Review browser closed");
     }
@@ -247,4 +253,18 @@ async function watchReview(id) {
       '<p>'+link(review.url,"Open original form to continue manually")+'</p><p class="muted">The filled browser stays open for up to 10 minutes with submission blocked. This screenshot is saved locally. The original link opens a fresh form.</p>'+
       '<img alt="Google Form prefill review" class="review-image" src="/api/review/'+review.id+'">';
   } catch (error) { flash(error.message); }
+}
+
+async function loadFormReviews() {
+  try {
+    const response=await fetch("/api/reviews");
+    if (!response.ok) return;
+    const {reviews}=await response.json();
+    const target=$("#form-reviews");
+    if (!target || !reviews.length) return;
+    target.innerHTML='<div class="section"><h2>Prepared Google Forms</h2></div><div class="stack">'+reviews.map(r=>{
+      const item=data.items.find(i=>i.id===r.opportunity);
+      return item ? '<div class="box"><strong>'+esc(item.title)+'</strong><p>'+esc(r.status)+'</p><button data-form-review="'+r.id+'" data-opportunity="'+esc(r.opportunity)+'">Open form review</button></div>' : "";
+    }).join("")+'</div>';
+  } catch {}
 }
