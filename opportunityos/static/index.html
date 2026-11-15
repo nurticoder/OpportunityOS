@@ -1,26 +1,30 @@
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>OpportunityOS · Personal workspace</title>
+<meta name="theme-color" content="#171512">
+<title>OpportunityOS — Today</title>
 <link rel="stylesheet" href="/style.css">
 <script src="/app.js" defer></script>
 </head>
 <body>
+<a href="#content" class="skip-link">Skip to workspace</a>
 <div class="shell">
 <aside class="sidebar">
-  <div class="brand"><span class="mark">✳</span><div>OpportunityOS<small>PERSONAL WORKSPACE</small></div></div>
-  <div class="nav-label">WORKSPACE</div>
+  <a class="brand" href="#today" aria-label="OpportunityOS Today"><span class="brand-symbol" aria-hidden="true">↗</span><span>Opportunity<br><b>OS</b></span></a>
+  <p class="workspace-note">Your next move.</p>
   <nav id="nav" aria-label="Workspace"></nav>
-  <div class="sidebar-foot"><span class="dot"></span> Local workspace <button id="theme" aria-label="Toggle color theme">◐</button></div>
+  <div class="sidebar-foot"><span class="connection-dot" aria-hidden="true"></span> Private. On this Mac.<p>Hong Kong <span id="clock"></span></p></div>
 </aside>
 <main>
-  <header class="top"><span id="crumb">Workspace / Dashboard</span><div class="agent"><span id="agent-status"></span><button id="pause">Pause</button><button id="stop">Stop</button><button id="run" class="primary">▶ Run now</button></div></header>
-  <div id="content" aria-live="off"><p>Opening workspace…</p></div>
+  <header class="top"><span id="crumb">Today</span><div class="agent"><span id="agent-status">Connecting</span><button id="pause">Pause</button><button id="stop">Stop</button><button id="run" class="primary">Run now <span aria-hidden="true">↗</span></button></div></header>
+  <div id="content" tabindex="-1"><p class="empty">Opening your workspace…</p></div>
+  <footer class="workspace-footer"><span>OpportunityOS / Personal command center</span><span>Discovery to decision.</span></footer>
 </main>
 </div>
-<dialog id="detail" aria-labelledby="detail-title"><article id="detail-body"></article><form method="dialog"><button>Close</button></form></dialog>
+<dialog id="detail" aria-labelledby="detail-title"><div class="drawer-head"><span>Opportunity / Evidence & preparation</span><form method="dialog"><button aria-label="Close opportunity">Close <kbd>Esc</kbd></button></form></div><article id="detail-body"></article></dialog>
+<dialog id="confirm" aria-labelledby="confirm-title"><form id="confirm-form"><h2 id="confirm-title"></h2><p id="confirm-description"></p><label id="confirm-label">Portal confirmation evidence<textarea name="evidence" required></textarea></label><div class="row"><button type="button" id="cancel-confirm">Cancel</button><button class="primary">Record submission</button></div></form></dialog>
 <div id="toast" role="status"></div>
 </body>
 </html>
