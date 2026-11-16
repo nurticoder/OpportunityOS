@@ -44,7 +44,7 @@ async function load(){
 }
 function renderAgent(state){
   $("#agent-status").textContent=state;
-  $("#run").textContent=state==="Paused"?"Resume ↗":"Run now ↗";
+  $("#run").textContent=state==="Paused"?"Resume search ↗":"Run search ↗";
   $("#run").disabled=["Running","Stopping"].includes(state);
   $("#pause").disabled=state!=="Running";
   $("#stop").disabled=["Stopped","Stopping"].includes(state);
@@ -260,14 +260,14 @@ function profile() {
 function settings() {
   const s = data.settings;
   return heading("Settings","Configure discovery, ranking and optional local drafting.")+'<div class="box"><form id="settings-form">'+
-    '<h2>Discovery & extraction</h2><label>Operating schedule<select name="discovery_schedule_mode"><option value="always" '+(s.discovery_schedule_mode!=="window"?"selected":"")+'>While app is running</option><option value="window" '+(s.discovery_schedule_mode==="window"?"selected":"")+'>Only in working window</option></select></label>'+
-    '<label>Check interval (minutes)<input type="number" name="discovery_interval_minutes" min="5" max="1440" value="'+esc(s.discovery_interval_minutes || 30)+'" required></label>'+
+    '<h2>Discovery & extraction</h2><label>Operating schedule<select name="discovery_schedule_mode"><option value="manual" '+(!s.discovery_schedule_mode || s.discovery_schedule_mode==="manual"?"selected":"")+'>Manual only · Run search</option><option value="always" '+(s.discovery_schedule_mode==="always"?"selected":"")+'>Automatic intervals while app is running</option><option value="window" '+(s.discovery_schedule_mode==="window"?"selected":"")+'>Only in working window</option></select></label>'+
+    '<label>Automatic check interval (minutes; ignored in manual mode)<input type="number" name="discovery_interval_minutes" min="5" max="1440" value="'+esc(s.discovery_interval_minutes || 30)+'" required></label>'+
     '<label>Maximum new model extractions per run<input name="extraction_batch_limit" type="number" min="1" max="20" value="'+esc(s.extraction_batch_limit || 5)+'"></label>'+
     '<label>Extraction provider<select name="extraction_provider">'+[["ollama","Local Ollama"],["local_chat","Local chat-completions server"],["regex","Regex fallback only"]].map(([v,t])=>'<option value="'+v+'" '+(s.extraction_provider===v?'selected':'')+'>'+t+'</option>').join("")+'</select></label>'+
     '<label>Extraction model<input name="extraction_model" value="'+esc(s.extraction_model || "qwen3:4b")+'" required></label>'+
     '<label>Local provider endpoint<input name="extraction_endpoint" value="'+esc(s.extraction_endpoint || "http://127.0.0.1:11434")+'" required></label>'+
     '<label>Minimum field confidence<input type="number" name="extraction_threshold" min="0.5" max="1" step="0.05" value="'+esc(s.extraction_threshold || .8)+'"></label>'+
-    '<p class="muted">Posts stay on this Mac. Unavailable or invalid model output uses the labeled regex fallback. Unchanged posts reuse extraction. New inference is limited by the budget above.</p>'+
+    '<p class="muted">Posts stay on this Mac. Unavailable or invalid model output uses the labeled regex fallback. Unchanged posts reuse extraction. New inference is limited by the budget above. Manual mode never starts discovery at login or on a timer. Ollama unloads the extraction model after each request.</p>'+
     '<h2>Working window · Hong Kong</h2><div class="row">'+["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((d,n)=>'<label><input type="checkbox" name="days" value="'+n+'" '+(s.days.includes(n)?"checked":"")+'> '+d+'</label>').join("")+'</div>'+
     '<div class="row"><label>Starts <input name="start" type="time" value="'+esc(s.start)+'" required></label><label>Ends <input name="end" type="time" value="'+esc(s.end)+'" required></label></div>'+
     '<label><input name="ac_only" type="checkbox" '+(s.ac_only?"checked":"")+'> Run on AC power only</label><h2>Official employer boards</h2><div class="row">'+
@@ -388,7 +388,7 @@ document.addEventListener("submit",async event=>{
   try{
     if(form.id==="add-source-form"){
       const result=await post("sources/add",{channel:values.get("channel")});
-      await load();render();flash("@"+result.channel+" saved · "+result.status);
+      await load();render();flash("@"+result.channel+" saved · "+(result.status==="queued" && data.settings.discovery_schedule_mode==="manual"?"click Run search to fetch":result.status));
     }
     else if(form.id==="paste-post-form"){
       flash("Extracting post with your local provider…");
@@ -445,8 +445,9 @@ function renderLastChecked(value){
   indicator.title=new Date(value).toLocaleString("en-HK",{timeZone:"Asia/Hong_Kong"});
 }
 function sourcesPage(){
-  return heading("Sources","Add a public Telegram channel. It is fetched immediately and included in future discovery runs.")+
-    '<form class="entry-form" id="add-source-form"><label>Public Telegram channel<input name="channel" placeholder="https://t.me/channel_name" required maxlength="200"></label><button class="primary">Add source & fetch</button></form>'+
+  const manual=!data.settings.discovery_schedule_mode || data.settings.discovery_schedule_mode==="manual";
+  return heading("Sources",manual?"Add a public Telegram channel. It will be checked when you click Run search.":"Add a public Telegram channel. It is fetched immediately and included in future discovery runs.")+
+    '<form class="entry-form" id="add-source-form"><label>Public Telegram channel<input name="channel" placeholder="https://t.me/channel_name" required maxlength="200"></label><button class="primary">'+(manual?"Save source":"Add source & fetch")+'</button></form>'+
     '<div class="section"><h2>Your public channels</h2></div><div class="health-list source-health">'+
     (data.settings.telegram_channels || []).map(channel=>{
       const health=data.health.find(h=>h.source==="telegram:"+channel);

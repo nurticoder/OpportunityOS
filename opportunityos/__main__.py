@@ -95,8 +95,8 @@ def update_settings(store, body):
             parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost", "::1"} or
             parsed.username or parsed.password or parsed.query or parsed.fragment):
         raise ValueError("Check interval, confidence threshold and the local provider endpoint")
-    schedule_mode = body.get("discovery_schedule_mode", current_settings.get("discovery_schedule_mode", "always"))
-    if schedule_mode not in {"always", "window"}:
+    schedule_mode = body.get("discovery_schedule_mode", current_settings.get("discovery_schedule_mode", "manual"))
+    if schedule_mode not in {"manual", "always", "window"}:
         raise ValueError("Choose an operating schedule")
     values = {"extraction_batch_limit": batch_limit, "extraction_provider": provider, "extraction_model": model, "extraction_endpoint": endpoint,
               "extraction_threshold": threshold, "discovery_interval_minutes": interval, "discovery_schedule_mode": schedule_mode,
