@@ -61,3 +61,12 @@
 - Stopped discovery and verified no Ollama models were loaded. Extraction now requests immediate model unloading after each response instead of keeping it resident for two minutes.
 - Added a regression test for manual mode, queued sources, and restart behavior. Existing scheduled modes remain available only when selected in Settings.
 - Validation: 30 automated tests passed, including the Ollama immediate-unload request contract. Playwright verified Manual only, Run search, and Save source in the deployed dashboard. A 35-second check across a scheduler tick after service restart confirmed no new discovery attempt and no loaded Ollama model.
+
+## Light landscape interface — November 16, 2026
+
+- Replaced the dark vermilion interface with a light blue/white workspace, dark slate text, blue actions, locally bundled typography, consistent line icons, and an existing landscape banner reused from the user's OnePrep-inspired Ikigai project. No image generation or external asset requests.
+- Restyled all nine pages, pipeline, source evidence drawer, forms, status indicators and mobile navigation. Today now accurately describes manual-only search instead of claiming a timer is enabled.
+- Completed two desktop/mobile screenshot passes for all nine pages plus the evidence drawer. The second pass corrected checkbox alignment and added visible stage jumps to the application board. Screenshots remain local in ignored outputs/light-pass1 and outputs/light-pass2.
+- Playwright verified no page overflow at 1440px/390px, local landscape rendering, light colors, manual settings, inbox filtering, evidence drawer, paste controls, profile expansion and source controls. No JavaScript or CSP errors; the existing harmless favicon 404 is recorded separately. No model inference or discovery was launched during these checks.
+- Repeatable browser check: PYTHONPATH=. .venv/bin/python tests/ui_browser_smoke.py --data /absolute/path/to/private-data. It tests a temporary database copy. Backend modules, API routes, profile/facts, application logic and manual-only scheduling are unchanged.
+- Final checks: 30 backend tests passed, JavaScript syntax and diff checks passed, and the staged macOS service rendered the new landscape dashboard. Additional live layout checks passed at 320px, 768px and 1024px. Agent remained Idle with manual scheduling and no loaded Ollama model.
