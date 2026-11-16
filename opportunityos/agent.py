@@ -39,6 +39,8 @@ class Agent:
                 if source not in pending:
                     pending.append(source)
                 db.execute("INSERT OR REPLACE INTO settings VALUES ('pending_sources', ?)", (json.dumps(pending),))
+            if self.store.settings().get("discovery_schedule_mode", "manual") == "manual":
+                return "queued"
             if not self.worker or not self.worker.is_alive():
                 try:
                     self.start(sources=pending)
@@ -116,6 +118,8 @@ class Agent:
 
     def tick(self, moment):
         settings = self.store.settings()
+        if settings.get("discovery_schedule_mode", "manual") == "manual":
+            return
         if not self.enabled or self.state != "Idle":
             return
         if settings.get("discovery_schedule_mode", "always") == "window" and not permitted(settings, moment):

@@ -22,7 +22,7 @@ def _generate(messages, schema, settings):
     if provider == "ollama":
         url = endpoint + "/api/chat"
         body = {"model": model, "messages": messages, "stream": False, "format": schema,
-                "keep_alive": "2m", "think": False, "options": {"temperature": 0, "num_ctx": 8192, "num_predict": 2600}}
+                "keep_alive": 0, "think": False, "options": {"temperature": 0, "num_ctx": 8192, "num_predict": 2600}}
     elif provider == "local_chat":
         url = endpoint + "/chat/completions"
         body = {"model": model, "messages": messages, "temperature": 0,

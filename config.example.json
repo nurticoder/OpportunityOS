@@ -30,7 +30,7 @@
   "extraction_threshold": 0.8,
   "extraction_batch_limit": 5,
   "discovery_interval_minutes": 30,
-  "discovery_schedule_mode": "always",
+  "discovery_schedule_mode": "manual",
   "telegram_notifications": false,
   "notification_min_score": 60
 }

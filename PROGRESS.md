@@ -54,3 +54,10 @@
 
 - Verified a genuine live Telegram post through Qwen3:4b and the shared ingestion path, persisted with model provenance. The measured standalone extraction took 89.5 seconds; the provider timeout is 180 seconds. A bounded one-model-call source refresh checked 20 real posts. The updated runtime is staged in the macOS login service. No synthetic benchmark posts were inserted into the personal database.
 - Restart recovery resumes persisted source requests even when an interrupted fetch left its health status as Fetching.
+
+## Manual search and resource use — November 16, 2026
+
+- Changed the default and this Mac’s saved operating schedule to Manual only. Timer ticks, login/restarts, wake, and adding a channel do not start discovery in manual mode. Run search performs one pass; manual pasted-post extraction remains an explicit action.
+- Stopped discovery and verified no Ollama models were loaded. Extraction now requests immediate model unloading after each response instead of keeping it resident for two minutes.
+- Added a regression test for manual mode, queued sources, and restart behavior. Existing scheduled modes remain available only when selected in Settings.
+- Validation: 30 automated tests passed, including the Ollama immediate-unload request contract. Playwright verified Manual only, Run search, and Save source in the deployed dashboard. A 35-second check across a scheduler tick after service restart confirmed no new discovery attempt and no loaded Ollama model.

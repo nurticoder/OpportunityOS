@@ -86,6 +86,7 @@ class Quality(unittest.TestCase):
 
     def test_thirty_minute_schedule_and_pause(self):
         with self.store.db() as db:
+            db.execute("INSERT INTO settings VALUES ('discovery_schedule_mode', '\"always\"')")
             db.execute("INSERT INTO settings VALUES ('last_discovery_attempt', ?)",(json.dumps(now()),))
         agent=Agent(self.store)
         with patch.object(agent,"start") as start:
@@ -136,10 +137,25 @@ class Quality(unittest.TestCase):
 
 
 class NotificationsAndQueue(unittest.TestCase):
+    def test_manual_mode_never_starts_discovery_until_run(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store=Store(directory)
+            agent=Agent(store)
+            with patch.object(Agent,"start") as start:
+                self.assertEqual(agent.request_source("telegram:example"),"queued")
+                agent.tick(datetime.now(HK)+timedelta(days=30))
+                Agent(store).tick(datetime.now(HK)+timedelta(days=60))
+                start.assert_not_called()
+            self.assertEqual(store.settings()["pending_sources"],["telegram:example"])
+            with patch("opportunityos.agent.threading.Thread") as worker:
+                agent.start()
+                worker.return_value.start.assert_called_once()
+
     def test_restart_resumes_persisted_source_after_interrupted_fetch(self):
         with tempfile.TemporaryDirectory() as directory:
             store=Store(directory)
             with store.db() as db:
+                db.execute("INSERT INTO settings VALUES ('discovery_schedule_mode', '\"always\"')")
                 db.execute("INSERT INTO settings VALUES ('pending_sources', ?)",
                            (json.dumps(["telegram:example"]),))
                 db.execute("INSERT INTO health VALUES (?, ?, 'Fetching', 0)",
@@ -207,7 +223,8 @@ class NotificationsAndQueue(unittest.TestCase):
             def log_message(self,*args):pass
             def do_POST(self):
                 received.append(json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
-                data=json.dumps({"choices":[{"message":{"content":json.dumps(document())}}]}).encode()
+                message={"content":json.dumps(document())}
+                data=json.dumps({"choices":[{"message":message}]} if self.path.endswith("/chat/completions") else {"message":message}).encode()
                 self.send_response(200);self.end_headers();self.wfile.write(data)
         server=ThreadingHTTPServer(("127.0.0.1",0),Provider)
         threading.Thread(target=server.serve_forever,daemon=True).start()
@@ -216,6 +233,10 @@ class NotificationsAndQueue(unittest.TestCase):
                               "extraction_endpoint":f"http://127.0.0.1:{server.server_port}"})
             self.assertEqual(item["extraction_engine"],"local_chat")
             self.assertTrue(received[0]["response_format"]["json_schema"]["strict"])
+            item=extract(RAW,{"extraction_provider":"ollama","extraction_model":"fixture",
+                              "extraction_endpoint":f"http://127.0.0.1:{server.server_port}"})
+            self.assertEqual(item["extraction_engine"],"ollama")
+            self.assertEqual(received[1]["keep_alive"],0)
             with self.assertRaises(ValueError):
                 generate([],{},{"extraction_provider":"ollama","extraction_endpoint":"https://outside.example"})
         finally:
