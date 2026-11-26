@@ -407,3 +407,5 @@ nav svg { display: block; width: 20px; height: 20px; }
 @media (max-width: 640px) { nav svg { width: 16px; height: 16px; } }
 
 .freshness-notice{display:flex;justify-content:space-between;align-items:center;gap:15px;padding:15px 20px;margin-bottom:22px;background:#fff5dd;border:1px solid #e7d8ab;border-radius:12px;color:#725723;font-size:13px}.freshness-notice button{flex-shrink:0;font-size:12px}@media(max-width:640px){.freshness-notice{align-items:flex-start;flex-direction:column}}
+
+.preparation-job{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:18px 22px;border:1px solid var(--line);border-radius:13px;background:white;margin-bottom:12px}.preparation-job p{margin:4px 0 0;color:var(--muted);font-size:13px}.preparation-job button{flex-shrink:0;font-size:12px}@media(max-width:640px){.preparation-job{align-items:flex-start;flex-direction:column}}

@@ -77,3 +77,12 @@
 - Added official Ashby adapters for OpenAI, Perplexity and Notion; public feeds were verified live. Existing source snapshots and personal data are retained.
 - Stale opportunities stay visible with an explicit refresh notice. Duplicate application URLs are grouped in the active feed while preserving source evidence and application history. Fixed logo hash navigation.
 - Added tests proving parallel fetches, zero inference in fast scans, duplicate grouping and Ashby response filtering.
+
+## Upgrade 2: cloud-backed application packages — November 26, 2026
+
+- Added official non-interactive Codex structured output using the existing ChatGPT login. Tools, user hooks, browser/computer access and shell execution are disabled in inference calls; sessions are ephemeral, cancellable, and limited to one cloud request at a time. API-key environment variables are removed and non-ChatGPT logins are refused. This uses plan allowance, not unlimited/free API access. No local model is required.
+- Added local PDF/DOCX/text CV reading, grounded application packages, source references, actual Greenhouse question inspection, regeneration history, downloadable cover letters, and unsent email files with the master CV attached. Existing verified facts are preserved; CV reading does not auto-verify new facts.
+- Added persistent preparation tasks and working Review Center controls, cancel/retry, cloud connection checking, and email editing. The original store.py and workflow.py remain unchanged.
+- Fixed extraction validation to reject a deadline date or nationality contradicted by its quote.
+- The actual fast source refresh completed 9 feeds / 111 posts in 10.5 seconds. A genuine Notion listing was prepared with the user's existing CV and verified facts through ChatGPT in 34.7 seconds. It flagged a graduation-date conflict and other missing eligibility facts rather than inventing them. No application was sent.
+- 41 automated tests passed before the final UI verification, covering CV reading, attachments, history, unsupported evidence, cancellation, restart behavior and the existing pipeline.
