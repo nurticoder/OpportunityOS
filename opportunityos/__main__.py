@@ -24,6 +24,8 @@ from .store import DEFAULTS, Store, now
 from .workflow import prepare, transition
 from .identity import group_duplicates
 from .tasks import Tasks
+from .browser_applications import BrowserApplications
+from .identity import destination
 from . import applications as application_service, cloud_ai, documents as document_library
 
 STATIC = Path(__file__).with_name("static")
@@ -141,6 +143,7 @@ def handler_for(store, agent, port):
     authority = f"127.0.0.1:{port}"
     reviews = FormReviews(store)
     preparations = Tasks(store)
+    browser_apps = BrowserApplications(store)
 
     class Handler(BaseHTTPRequestHandler):
         def log_request(self, code="-", size="-"):
@@ -176,6 +179,13 @@ def handler_for(store, agent, port):
                     kind = {".pdf":"application/pdf", ".docx":"application/vnd.openxmlformats-officedocument.wordprocessingml.document", ".txt":"text/plain; charset=utf-8"}.get(suffix, "application/octet-stream")
                     return self.send(content, kind, headers={"Content-Disposition": 'attachment; filename="master-cv'+suffix+'"'})
                 except ValueError as error: return self.json({"error":str(error)}, 400)
+            if path == "/api/browser/jobs":
+                return self.json({"jobs": browser_apps.list()})
+            if path.startswith("/api/browser/image/"):
+                ident = path.rsplit("/", 1)[-1]
+                if re.fullmatch(r"[a-f0-9]{32}", ident) and (browser_apps.folder/(ident+".png")).is_file():
+                    return self.send((browser_apps.folder/(ident+".png")).read_bytes(), "image/png")
+                return self.json({"error":"Browser preview unavailable"}, 404)
             if path == "/api/tasks":
                 return self.json({"tasks": preparations.list()})
             if path == "/api/ai/status":
@@ -226,12 +236,34 @@ def handler_for(store, agent, port):
                 if not isinstance(body, dict):
                     raise ValueError("Invalid request")
                 path = urlsplit(self.path).path
+                if path == "/api/browser/gmail-connect":
+                    return self.json({"job": browser_apps.connect_gmail()})
+                if path == "/api/browser/start":
+                    return self.json({"job": browser_apps.start(str(body["id"]))})
+                if path == "/api/browser/control":
+                    browser_apps.control(str(body["id"]), str(body["action"]), body.get("approval_token"))
+                    return self.json({"ok":True})
+                if path == "/api/browser/allow":
+                    with store.db() as db:
+                        row=db.execute("SELECT payload FROM opportunities WHERE id=?",(body["id"],)).fetchone()
+                        if not row:raise ValueError("Opportunity not found")
+                        item=json.loads(row["payload"]);target=destination(item.get("application_link"))
+                        if not target:raise ValueError("No supported application destination")
+                        db.execute("INSERT OR REPLACE INTO settings VALUES (?,?)",("browser_permission:"+body["id"],json.dumps(target)))
+                    return self.json({"ok":True})
                 if path == "/api/prepare":
                     ident = str(body["id"])
                     words = int(body.get("words", 250))
                     if not 1 <= words <= 1200: raise ValueError("Word limit must be between 1 and 1200")
                     prompt = str(body.get("prompt", ""))[:5000]
-                    task = preparations.start(ident, lambda cancel, progress: application_service.prepare(store, ident, prompt, words, cancel=cancel, progress=progress))
+                    def prepare_work(cancel, progress):
+                        result=application_service.prepare(store, ident, prompt, words, cancel=cancel, progress=progress)
+                        if body.get("prepare_browser") is True and not cancel.is_set():
+                            progress("Opening the application browser for review")
+                            try:result["browser_job"]=browser_apps.start(ident, cancel=cancel)
+                            except ValueError as error:result["browser_attention"]=str(error)
+                        return result
+                    task = preparations.start(ident, prepare_work)
                     return self.json({"task": task})
                 if path == "/api/tasks/cancel":
                     preparations.cancel(body.get("id"))
@@ -306,7 +338,9 @@ def handler_for(store, agent, port):
                     agent.start()
                 elif action in {"pause", "stop"}:
                     agent.control(action)
-                    if action == "stop": preparations.cancel()
+                    if action == "stop":
+                        preparations.cancel()
+                        browser_apps.cancel_all()
                 else:
                     raise ValueError("Unknown agent action")
             elif path == "/api/fact":

@@ -99,3 +99,23 @@ Manual mode keeps the dashboard available without background discovery. Ollama u
 Open an opportunity and click **Prepare application**, or choose **Apply** in triage. Review Center shows progress and the resulting package. The app rechecks stale official feeds, reads your existing master CV locally, fetches supported official question metadata, and sends the selected listing, share-approved verified facts and CV text to ChatGPT. CV claims remain document-sourced and require review; imported documents never silently change verification flags. Drafts include missing requirements and source references. Regeneration retains previous drafts. Submitted applications and duplicate destinations cannot be regenerated as new applications.
 
 The cloud path does not invoke Ollama. You can cancel preparation using its task control or Stop. Only one cloud request runs at a time; the process is terminated on cancellation. An interrupted job stays interrupted after restart until you explicitly retry. Download the cover letter or, for a source-provided email destination, an unsent email file with the master CV attached. No email is sent by downloading it.
+
+## Browser applications and Gmail
+
+**Prepare application** now creates a grounded package and attempts to open its supported application in an isolated browser. Official Greenhouse/Ashby destinations are supported directly; unfamiliar destinations need explicit permission from the opportunity editor. The agent fills recognized standard controls and grounded answers. Sensitive/demographic questions and legal declarations are left for you. Missing work authorization, unavailable information, CAPTCHA or unsupported widgets are shown as exact requirements rather than guessed.
+
+In Review Center, inspect the browser preview, complete genuinely missing questions in the opened browser, and click **Refresh review**. **Approve and submit** appears only for a complete preview. Its one-use token is bound to the current fields, draft, profile and CV. The controller requires a new review after changes and records Submitted only after a confirmation appears. If confirmation is ambiguous, check the destination; the agent blocks automatic retry to prevent duplicate applications. Browser sessions close after ten minutes and can be stopped from the dashboard. Complex multi-page portals and unsupported widgets may still require manual completion.
+
+For email applications, click **Connect Gmail** in Settings and sign in once in Google's browser flow. OpportunityOS uses its own private Chrome profile, never copies your personal Chrome profile, and never asks for your password in chat. Once signed in, it can compose an unsent draft with the selected CV. Each send requires explicit approval and observed confirmation. This browser connector depends on Gmail's current UI and may stop if Google restricts automated access; it never bypasses those restrictions. The legacy metadata-only OAuth CLI remains separate. An unsent .eml download is available even when Gmail is not connected.
+
+All private browser data and generated application artifacts stay in the application's private directory. The browser workflow runs only on request; it is not a background computer-control daemon.
+
+Browser verification commands (Chrome and requirements-browser.txt required):
+
+```sh
+.venv/bin/python -m unittest discover -s tests -v
+PYTHONPATH=. .venv/bin/python tests/ui_browser_smoke.py --data /absolute/path/to/private-data
+PYTHONPATH=. .venv/bin/python tests/browser_review_ui_smoke.py
+```
+
+The submission integration tests run only against their own disposable loopback form. The review UI test intercepts all submission calls and never submits to a real destination. Gmail or a real portal requires an authenticated, permitted session and an explicit per-application approval; those credentials and approvals cannot be fabricated by the test suite.
