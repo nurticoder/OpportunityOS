@@ -70,3 +70,10 @@
 - Playwright verified no page overflow at 1440px/390px, local landscape rendering, light colors, manual settings, inbox filtering, evidence drawer, paste controls, profile expansion and source controls. No JavaScript or CSP errors; the existing harmless favicon 404 is recorded separately. No model inference or discovery was launched during these checks.
 - Repeatable browser check: PYTHONPATH=. .venv/bin/python tests/ui_browser_smoke.py --data /absolute/path/to/private-data. It tests a temporary database copy. Backend modules, API routes, profile/facts, application logic and manual-only scheduling are unchanged.
 - Final checks: 30 backend tests passed, JavaScript syntax and diff checks passed, and the staged macOS service rendered the new landscape dashboard. Additional live layout checks passed at 320px, 768px and 1024px. Agent remained Idle with manual scheduling and no loaded Ollama model.
+
+## Upgrade 1: fast discovery — November 26, 2026
+
+- Discovery now fetches up to three public sources concurrently, publishes each completed source immediately, and performs no local or remote model inference during search. Progress is visible in the header. Manual scheduling is preserved.
+- Added official Ashby adapters for OpenAI, Perplexity and Notion; public feeds were verified live. Existing source snapshots and personal data are retained.
+- Stale opportunities stay visible with an explicit refresh notice. Duplicate application URLs are grouped in the active feed while preserving source evidence and application history. Fixed logo hash navigation.
+- Added tests proving parallel fetches, zero inference in fast scans, duplicate grouping and Ashby response filtering.

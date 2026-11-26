@@ -39,6 +39,8 @@ class Quality(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.store=Store(self.temp.name)
+        with self.store.db() as db:
+            db.execute("INSERT INTO settings VALUES ('extraction_provider', '\"ollama\"')")
 
     def test_strict_evidence_and_confidence(self):
         doc=document()

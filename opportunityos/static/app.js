@@ -12,6 +12,7 @@ let data, selected, timer, triageId, pendingSubmission, dragging, evidenceTerm="
 let formReviews=[];
 const filter={q:"",group:"",pay:false,hidden:false};
 const heading=(title,sub)=>'<div class="page-heading"><h1>'+esc(title)+'</h1><p>'+esc(sub)+'</p></div>';
+const staleNotice=()=>data.items.some(i=>i.state==="Needs refresh")?'<div class="freshness-notice"><span>Saved opportunities need a fresh check. You can still review their evidence.</span><button data-refresh-listings>Refresh opportunities</button></div>':"";
 const empty=text=>'<div class="empty">'+esc(text)+'</div>';
 const link=(href,title)=>'<a target="_blank" rel="noopener noreferrer" href="'+url(href)+'">'+esc(title)+' <span aria-hidden="true">↗</span></a>';
 const hkDate=value=>new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Hong_Kong",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(value));
@@ -21,7 +22,7 @@ function deadline(item){
   const days=Math.round((Date.parse(item.deadline+"T00:00:00+08:00")-Date.parse(hkDate(Date.now())+"T00:00:00+08:00"))/86400000);
   return {text:days<0?"Deadline passed":days===0?"Closes today":days===1?"1 day left":days+" days left",urgent:deadlineTime(item)-Date.now()<172800000 && days>=0,days};
 }
-const active=()=>data.items.filter(i=>i.state==="Listed"&&i.eligibility!=="Ineligible"&&i.choice!=="skip"&&deadline(i).days>=0);
+const active=()=>data.items.filter(i=>["Listed","Needs refresh"].includes(i.state)&&!i.duplicate_of&&i.eligibility!=="Ineligible"&&i.choice!=="skip"&&deadline(i).days>=0);
 const triageable=()=>active().filter(i=>!data.apps.some(a=>a.opportunity===i.id));
 const review=()=>data.apps.filter(a=>a.status==="Awaiting review");
 const reviewCount=()=>review().length+formReviews.filter(r=>r.status==="Awaiting review"||r.status==="Needs attention").length;
@@ -40,11 +41,11 @@ async function load(){
   data=await response.json();
   const formsResponse=await fetch("/api/reviews");
   if(formsResponse.ok)formReviews=(await formsResponse.json()).reviews;
-  renderAgent(data.agent);
+  renderAgent(data.agent,data.agent_progress);
   renderLastChecked(data.last_checked);
 }
-function renderAgent(state){
-  $("#agent-status").textContent=state;
+function renderAgent(state,progress){
+  $("#agent-status").textContent=state==="Running" && progress?"Searching "+progress.done+"/"+progress.total:state;
   $("#run").textContent=state==="Paused"?"Resume search":"Run search";
   $("#run").disabled=["Running","Stopping"].includes(state);
   $("#pause").disabled=state!=="Running";
@@ -71,7 +72,7 @@ function methodBadge(i){const [icon,text]=methodInfo(i);return '<span class="met
 function briefing(){
   const leads=prioritized(triageable()),next=leads.find(i=>i.deadline),fresh=active().filter(i=>hkDate(i.discovered)===hkDate(Date.now())).length;
   const date=new Intl.DateTimeFormat("en-HK",{timeZone:"Asia/Hong_Kong",weekday:"long",day:"numeric",month:"long"}).format(new Date());
-  return '<div class="briefing"><div class="briefing-landscape" aria-hidden="true">'+landscapeArt+'</div><div class="briefing-title"><span class="date-line">'+esc(date)+'</span><h1>Your next chapter<br>starts here.</h1><p>Good opportunities. A little more possibility.</p></div><div class="briefing-lines">'+
+  return staleNotice()+'<div class="briefing"><div class="briefing-landscape" aria-hidden="true">'+landscapeArt+'</div><div class="briefing-title"><span class="date-line">'+esc(date)+'</span><h1>Your next chapter<br>starts here.</h1><p>Good opportunities. A little more possibility.</p></div><div class="briefing-lines">'+
     '<button data-nav="Inbox"><strong>'+fresh+'</strong><span>new today<small>'+triageable().length+' opportunities to triage</small></span><span aria-hidden="true">↗</span></button>'+
     '<button '+(next?'data-detail="'+esc(next.id)+'"':'data-nav="Timeline"')+'><strong>'+(next?deadline(next).days:'—')+'</strong><span>'+(next?(deadline(next).days===1?'day to the next close':'days to the next close'):'confirmed deadlines')+'<small>'+esc(next?displayTitle(next.title):"Dates remain unknown. Check source posts.")+'</small></span><span aria-hidden="true">↗</span></button>'+
     '<button data-nav="Review Center"><strong>'+reviewCount()+'</strong><span>waiting for your review<small>Drafts and forms that need your judgment</small></span><span aria-hidden="true">↗</span></button></div></div>'+
@@ -85,7 +86,7 @@ function hits(){
 function inbox(){
   const groups=[...new Set(data.items.map(i=>i.group))].sort();
   return heading("Triage inbox","Find the openings worth your attention. Decide what happens next.")+
-    pasteInbox()+'<div class="toolbar"><input id="search" type="search" aria-label="Search opportunities" placeholder="Search opportunities, company, location" value="'+esc(filter.q)+'">'+
+    staleNotice()+pasteInbox()+'<div class="toolbar"><input id="search" type="search" aria-label="Search opportunities" placeholder="Search opportunities, company, location" value="'+esc(filter.q)+'">'+
     '<select id="group" aria-label="Recommendation group"><option value="">All fits</option>'+groups.map(g=>'<option'+(g===filter.group?' selected':'')+'>'+esc(g)+'</option>').join("")+
     '</select><label><input id="pay" type="checkbox" '+(filter.pay?'checked':'')+'> Pay disclosed</label><label><input id="hidden" type="checkbox" '+(filter.hidden?'checked':'')+'> Include skipped & ineligible</label></div><div id="triage"></div>';
 }
@@ -199,7 +200,7 @@ function showDetail(id){
   const i=selected,existing=data.apps.find(a=>a.opportunity===id);
   $("#detail-body").innerHTML='<div class="drawer-title"><p>'+esc(i.organization==="Unknown"?"Organization unconfirmed":i.organization)+' / '+esc(i.category)+'</p><h2 id="detail-title">'+esc(displayTitle(i.title))+'</h2><div class="row">'+deadlineBadge(i)+methodBadge(i)+'</div><p class="verdict">'+esc(verdict(i))+'</p></div>'+
     '<div class="evidence-layout"><section class="original-post"><div class="section"><h3>'+(i.capture_method==="public_preview"?"Public preview":"Original source")+'</h3>'+((i.source_link||i.evidence||"").startsWith("urn:")?"<span class=\"muted\">Pasted text</span>":link(i.source_link||i.evidence,"Open post"))+'</div><p class="muted">Select an extracted field to locate its text.</p><pre id="source-text"></pre></section>'+
-    '<section class="extracted"><h3>Extracted fields</h3><p class="muted">'+esc(i.extraction_engine==="regex_fallback"?"Regex fallback · local model unavailable, deferred or failed validation.":i.extraction_engine?"Local model · "+i.extraction_model:"Legacy extraction")+'. Model-reported confidence is not calibrated. Select a field to locate its quoted evidence.</p><dl>'+provenance(i).map(([name,value,term,evidence])=>{
+    '<section class="extracted"><h3>Extracted fields</h3><p class="muted">'+esc(i.extraction_engine==="regex_fallback"?(i.extraction_fallback_reason==="fast_scan"?"Fast scan · no model inference; review extracted requirements.":"Rule extraction · AI enrichment not yet available."):i.extraction_engine?"Local model · "+i.extraction_model:"Legacy extraction")+'. Model-reported confidence is not calibrated. Select a field to locate its quoted evidence.</p><dl>'+provenance(i).map(([name,value,term,evidence])=>{
       const raw=i.raw_text||i.description||"",match=term&&raw.toLocaleLowerCase().includes(term.toLocaleLowerCase());
       return '<div><dt>'+name+'</dt><dd>'+ (match?'<button class="evidence-value" data-evidence="'+esc(term)+'">'+esc(value)+' <span aria-hidden="true">⌖</span></button>':'<span>'+esc(value)+'</span>')+'<small>'+(evidence ? (evidence.value==="unknown"?"Unknown · insufficient evidence":(i.extraction_engine==="regex_fallback"?"Fallback":"Model")+" confidence "+Math.round(evidence.confidence*100)+"%") : (value==="Unknown"?"Not stated":match?"Exact source match":"No exact source match"))+'</small></dd></div>';
     }).join("")+'</dl></section></div>'+
@@ -207,7 +208,7 @@ function showDetail(id){
     ((i.application_link||i.url||"").startsWith("urn:")?'<p class="muted">No application destination found.</p>':link(i.application_link||i.url,"Open application"))+
     (i.apply_method==="google_form"?'<p><button class="primary" id="prefill-form">Prefill Google Form for review</button></p><div id="prefill-result"></div>':
     i.id.startsWith("greenhouse:")?'<p><button id="inspect-form">Check portal questions</button></p><div id="portal-questions"></div>':"")+
-    '<div id="application-editor">'+(existing?application(existing):i.state==="Listed"&&i.eligibility!=="Ineligible"?
+    '<div id="application-editor">'+(existing?application(existing):["Listed","Needs refresh"].includes(i.state)&&!i.duplicate_of&&i.eligibility!=="Ineligible"?
     '<form id="draft-form" class="stack"><label>Application question (optional)<textarea name="prompt" maxlength="5000" placeholder="Paste the original question"></textarea></label><label>Word limit <input name="words" type="number" min="1" max="1200" value="250" required></label><button class="primary">Prepare draft for review</button></form>':empty("This record is currently unavailable for drafting."))+'</div></div>';
   highlightPost();
   if(!$("#detail").open)$("#detail").showModal();
@@ -317,7 +318,8 @@ document.addEventListener("click",async event=>{
   const button=event.target.closest("button");
   if(!button||button.disabled)return;
   try{
-    if(button.dataset.nav)await navigate(button.dataset.nav);
+    if(button.hasAttribute("data-refresh-listings"))await mutate("agent",{action:"run"},"Fast search started. Results appear as sources finish.");
+    else if(button.dataset.nav)await navigate(button.dataset.nav);
     else if(button.dataset.detail)showDetail(button.dataset.detail);
     else if(button.dataset.laneTarget){
       const lane=document.querySelector('[data-stage="'+button.dataset.laneTarget+'"]');
@@ -346,6 +348,7 @@ document.addEventListener("click",async event=>{
     else if(button.id==="cancel-confirm")$("#confirm").close();
   }catch(error){flash(error.message);}
 });
+window.addEventListener("hashchange",()=>{const target=Object.keys(routes).find(k=>routes[k]===location.hash.slice(1));if(target && target!==page)navigate(target);});
 document.addEventListener("keydown",async event=>{
   if(event.ctrlKey||event.metaKey||event.altKey||event.repeat||$("#detail").open||$("#confirm").open||
     event.target.closest("input,textarea,select,[contenteditable=true]")||!["Today","Inbox"].includes(page))return;
@@ -433,8 +436,8 @@ setInterval(async()=>{
   if(document.hidden)return;
   try{
     const response=await fetch("/api/heartbeat");if(!response.ok)return;
-    const {agent,revision,last_checked}=await response.json();renderAgent(agent);renderLastChecked(last_checked);
-    if((page==="Agent Activity"||page==="Sources"&&!document.activeElement.closest("input,textarea,select"))&&data?.revision!==revision){await load();render();}
+    const {agent,agent_progress,revision,last_checked}=await response.json();renderAgent(agent,agent_progress);renderLastChecked(last_checked);
+    if(!["Profile","Settings"].includes(page)&&!$("#detail").open&&!document.activeElement.closest("input,textarea,select")&&data?.revision!==revision){await load();render();}
   }catch{}
 },5000);
 
