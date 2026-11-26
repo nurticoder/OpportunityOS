@@ -83,6 +83,9 @@ def prepare(store,ident,prompt='',words=250,cancel=None,progress=None,provider=N
           'answers':app['answers'],'email_to':email_to,'email_subject':app['email_subject'].replace('\n',' ').replace('\r',' ')[:250],
           'email_body':app['email_body'],'used_sources':app['used_sources'],'document_ids':[doc['id'] for doc in context['documents']],
           'draft_history':history,'version':prior_payload.get('version',0)+1,'prepared_at':now()}
+ # Keep external draft IDs and uncertain submission evidence across regeneration.
+ for key in ('connected_gmail','gmail_draft_saved','gmail_draft_saved_at','browser_attempt'):
+  if key in prior_payload:payload[key]=prior_payload[key]
  with store.db() as db:
   db.execute('BEGIN IMMEDIATE')
   current=db.execute('SELECT status FROM applications WHERE opportunity=?',(ident,)).fetchone()
