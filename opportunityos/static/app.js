@@ -9,8 +9,8 @@ const sections = Object.fromEntries(Object.entries({"Today": "<rect x=\"3\" y=\"
 const routes = {"Today":"today","Inbox":"inbox","Applications":"applications","Timeline":"timeline","Review Center":"review","Profile":"profile","Agent Activity":"activity","Sources":"sources","Settings":"settings"};
 let page=Object.keys(routes).find(k=>routes[k]===location.hash.slice(1)) || "Today";
 let data, selected, timer, triageId, pendingSubmission, dragging, evidenceTerm="";
-let formReviews=[], preparationTasks=[];
-const taskWatches=new Set();
+let formReviews=[], preparationTasks=[], browserJobs=[];
+const taskWatches=new Set(),browserWatches=new Set();
 const filter={q:"",group:"",pay:false,hidden:false};
 const heading=(title,sub)=>'<div class="page-heading"><h1>'+esc(title)+'</h1><p>'+esc(sub)+'</p></div>';
 const staleNotice=()=>data.items.some(i=>i.state==="Needs refresh")?'<div class="freshness-notice"><span>Saved opportunities need a fresh check. You can still review their evidence.</span><button data-refresh-listings>Refresh opportunities</button></div>':"";
@@ -44,6 +44,8 @@ async function load(){
   if(formsResponse.ok)formReviews=(await formsResponse.json()).reviews;
   const tasksResponse=await fetch("/api/tasks");if(tasksResponse.ok)preparationTasks=(await tasksResponse.json()).tasks;
   for(const task of preparationTasks.filter(t=>["Queued","Running"].includes(t.status)))watchPreparation(task.id);
+  const browserResponse=await fetch("/api/browser/jobs");if(browserResponse.ok)browserJobs=(await browserResponse.json()).jobs;
+  for(const job of browserJobs.filter(j=>j.active&&["Opening","Filling","Needs login","Needs attention","Awaiting approval","Submitting"].includes(j.status)))watchBrowser(job.id);
   renderAgent(data.agent,data.agent_progress);
   renderLastChecked(data.last_checked);
 }
@@ -114,11 +116,14 @@ function step(direction){
   triageId=items[Math.min(items.length-1,Math.max(0,index+direction))]?.id;renderTriage();
 }
 async function startPreparation(id,prompt="",words=250){
-  const result=await post("prepare",{id,prompt,words});
+  const result=await post("prepare",{id,prompt,words,prepare_browser:true});
   await navigate("Review Center");await load();render();watchPreparation(result.task);
   flash("Preparing with your ChatGPT plan. No local model is running.");
 }
-function preparationPanel(){return '<div id="preparation-list">'+preparationTasks.slice(0,8).map(t=>'<div class="preparation-job"><div><strong>'+esc(t.status)+'</strong><p>'+esc(t.message)+'</p></div>'+(t.status==="Complete"?'<button data-edit="'+esc(t.opportunity)+'">Review package</button>':["Queued","Running"].includes(t.status)?'<button data-cancel-task="'+t.id+'">Cancel</button>':'<button data-prepare="'+esc(t.opportunity)+'">Retry preparation</button>')+'</div>').join("")+'</div>';}
+async function startBrowser(id){const result=await post("browser/start",{id});await navigate("Review Center");await load();render();watchBrowser(result.job);flash("The application opens in a separate private browser window.");}
+function browserPanel(){return '<div id="browser-jobs">'+browserJobs.slice(0,8).map(job=>'<details class="box browser-job" '+(["Awaiting approval","Needs attention","Needs login"].includes(job.status)?'open':'')+'><summary>'+esc(job.kind==="gmail-login"?"Connect Gmail":job.kind==="email"?"Gmail application":"Browser application")+' <span class="chip">'+esc(job.status)+'</span></summary><p>'+esc(job.message)+'</p>'+(job.url?'<p>'+link(job.url,"Application destination")+'</p>':'')+(job.missing?.length?'<ul class="review-notes">'+job.missing.map(m=>'<li>'+esc(m)+'</li>').join('')+'</ul>':'')+(job.fields?.length?'<dl class="browser-field-preview">'+job.fields.map(f=>'<div><dt>'+esc(f.label)+'</dt><dd>'+esc(f.value||"Unfilled")+'</dd></div>').join('')+'</dl>':'')+(job.preview_hash?'<details><summary>Browser screenshot</summary><img class="review-image" src="/api/browser/image/'+job.id+'" alt="Prepared application screenshot"></details>':'')+'<div class="row">'+(job.active&&["Awaiting approval","Needs attention","Needs login"].includes(job.status)?(job.kind==='gmail-login'?'':'<button data-browser-control="refresh" data-job="'+job.id+'">Refresh review</button>')+'<button data-browser-control="cancel" data-job="'+job.id+'">Close browser</button>':'')+(job.status==="Awaiting approval"&&!job.missing?.length?'<button class="primary" data-browser-control="approve" data-job="'+job.id+'">Approve and submit</button>':'')+'</div></details>').join('')+'</div>';}
+async function watchBrowser(id){if(browserWatches.has(id))return;browserWatches.add(id);const poll=async()=>{try{const response=await fetch("/api/browser/jobs");browserJobs=(await response.json()).jobs;const job=browserJobs.find(j=>j.id===id);const panel=$("#browser-jobs");const signature=JSON.stringify(browserJobs.map(j=>[j.id,j.updated,j.active]));if(panel&&panel.dataset.version!==signature){panel.outerHTML=browserPanel();$("#browser-jobs").dataset.version=signature;}if(job?.active&&["Opening","Filling","Needs login","Needs attention","Awaiting approval","Submitting"].includes(job.status)){setTimeout(poll,2500);return;}browserWatches.delete(id);await load();if(!$("#detail").open&&!document.activeElement.closest("input,textarea,select"))render();}catch{setTimeout(poll,5000);}};setTimeout(poll,700);}
+function preparationPanel(){return '<div id="preparation-list">'+preparationTasks.slice(0,8).map(t=>'<div class="preparation-job"><div><strong>'+esc(t.status)+'</strong><p>'+esc(t.message)+(t.result?.browser_attention?" · "+esc(t.result.browser_attention):"")+'</p></div>'+(t.status==="Complete"?'<button data-edit="'+esc(t.opportunity)+'">Review package</button>':["Queued","Running"].includes(t.status)?'<button data-cancel-task="'+t.id+'">Cancel</button>':'<button data-prepare="'+esc(t.opportunity)+'">Retry preparation</button>')+'</div>').join("")+'</div>';}
 async function watchPreparation(id){
  if(taskWatches.has(id))return;taskWatches.add(id);
  const poll=async()=>{try{const response=await fetch("/api/tasks");preparationTasks=(await response.json()).tasks;const task=preparationTasks.find(t=>t.id===id);const panel=$("#preparation-list");if(panel)panel.outerHTML=preparationPanel();
@@ -235,7 +240,7 @@ function activity(rows){
 }
 function reviewsPage(){
   return heading("Review Center","Decisions that need a human touch. Your drafts and prepared forms, together.")+
-    preparationPanel()+'<div id="form-reviews"></div><div class="section"><h2>Application drafts <span class="count">'+review().length+'</span></h2></div>'+
+    browserPanel()+preparationPanel()+'<div id="form-reviews"></div><div class="section"><h2>Application drafts <span class="count">'+review().length+'</span></h2></div>'+
     (review().length?'<div class="stack">'+review().map(application).join("")+'</div>':empty("No drafts waiting. Open an opportunity to prepare your first application."));
 }
 function render(){
@@ -267,7 +272,7 @@ function application(a) {
     (["Awaiting review","Ready"].includes(a.status) ? '<form data-action="save"><label>Draft<textarea name="draft" maxlength="16000">'+esc(a.draft)+'</textarea></label><button>Save draft</button></form>' : '<pre>'+esc(a.draft)+'</pre>') +
     (a.status==="Ready" ? '<form data-action="submitted"><label>Portal confirmation or receipt <input name="evidence" required maxlength="2000"></label><button>Record manual submission</button></form>' : "") +
     (a.evidence ? '<p>Recorded evidence: '+esc(a.evidence)+'</p>' : "") +
-    (a.method?.startsWith("ChatGPT")?'<p class="muted">Sources: '+esc((a.used_sources||[]).map(s=>s.startsWith('fact:')?'Verified '+label(s.slice(5)):'Master CV').filter((v,i,all)=>all.indexOf(v)===i).join(', '))+'</p><p>'+((a.document_ids||[]).map(id=>'<a href="/api/document/'+encodeURIComponent(id)+'">'+esc(data.documents.find(d=>d.id===id)?.name||'Master CV')+'</a>').join(', ')||'No CV attached')+'</p>'+(a.answers||[]).map(answer=>'<details><summary>'+esc(answer.question)+'</summary><p>'+esc(answer.answer)+'</p></details>').join('')+'<div class="row"><a href="/api/application/text?id='+encodeURIComponent(a.opportunity)+'">Download cover letter</a>'+ (a.email_to?'<a href="/api/application/export?id='+encodeURIComponent(a.opportunity)+'">Download email with CV</a>':'')+'</div>'+(['Awaiting review','Ready'].includes(a.status)?'<button data-prepare="'+esc(a.opportunity)+'">Regenerate with cloud AI</button>':'')+(a.email_to?'<form data-email-edit="'+esc(a.opportunity)+'"><p>To: '+esc(a.email_to)+'</p><label>Subject<input name="subject" value="'+esc(a.email_subject)+'"></label><label>Email body<textarea name="body">'+esc(a.email_body)+'</textarea></label><button>Save email draft</button></form>':''):'')+'<div class="row actions">'+actions.map(([action,title])=>'<button data-action="'+esc(action)+'">'+esc(title)+'</button>').join("")+'</div></details>';
+    (a.method?.startsWith("ChatGPT")?'<p class="muted">Sources: '+esc((a.used_sources||[]).map(s=>s.startsWith('fact:')?'Verified '+label(s.slice(5)):'Master CV').filter((v,i,all)=>all.indexOf(v)===i).join(', '))+'</p><p>'+((a.document_ids||[]).map(id=>'<a href="/api/document/'+encodeURIComponent(id)+'">'+esc(data.documents.find(d=>d.id===id)?.name||'Master CV')+'</a>').join(', ')||'No CV attached')+'</p>'+(a.answers||[]).map(answer=>'<details><summary>'+esc(answer.question)+'</summary><p>'+esc(answer.answer)+'</p></details>').join('')+'<div class="row"><a href="/api/application/text?id='+encodeURIComponent(a.opportunity)+'">Download cover letter</a>'+ (a.email_to?'<a href="/api/application/export?id='+encodeURIComponent(a.opportunity)+'">Download email with CV</a>':'')+'</div>'+(a.email_to?'<form data-email-edit="'+esc(a.opportunity)+'"><p>To: '+esc(a.email_to)+'</p><label>Subject<input name="subject" value="'+esc(a.email_subject)+'"></label><label>Email body<textarea name="body">'+esc(a.email_body)+'</textarea></label><button>Save email draft</button></form>':''):'')+(['Awaiting review','Ready'].includes(a.status)?'<div class="row"><button data-prepare="'+esc(a.opportunity)+'">Prepare again with cloud AI</button>'+(a.method?.startsWith('ChatGPT')?'<button class="primary" data-browser-start="'+esc(a.opportunity)+'">'+(a.email_to?'Prepare Gmail draft':'Fill application in browser')+'</button>':'')+((i.id.startsWith('telegram:')||i.id.startsWith('manual:'))&&!data.settings['browser_permission:'+i.id]&&!data.settings.source_allowlist?.includes(i.source)?'<button data-browser-allow="'+esc(a.opportunity)+'">Allow this destination and prepare</button>':'')+'</div>':'')+'<div class="row actions">'+actions.map(([action,title])=>'<button data-action="'+esc(action)+'">'+esc(title)+'</button>').join("")+'</div></details>';
 }
 function profile() {
   const fields = Object.values(data.facts).map(f=>'<details class="box"><summary>'+esc(label(f.key))+' <span class="chip">'+(f.verified?"Verified":f.value?"Unverified":"Missing")+'</span></summary><form data-fact="'+esc(f.key)+'"><label>Value<textarea name="value" maxlength="5000">'+esc(f.value)+'</textarea></label><label>Source <input name="source" value="'+esc(f.source)+'" maxlength="300"></label><label><input type="checkbox" name="verified" '+(f.verified?"checked":"")+'> I verified this fact</label><label><input type="checkbox" name="share" '+(f.share?"checked":"")+'> May be shared automatically when supported</label><button>Save fact</button></form></details>');
@@ -278,7 +283,7 @@ function profile() {
 }
 function settings() {
   const s = data.settings;
-  return heading("Settings","Configure discovery, ranking and optional local drafting.")+'<div class="box"><form id="settings-form">'+
+  return heading("Settings","Configure discovery, cloud preparation and browser connections.")+'<div class="box"><h2>Gmail browser connection</h2><p>Sign in once in an isolated Google browser window. The agent can then prepare unsent email drafts with your CV. Each send requires your explicit approval.</p><button id="connect-gmail">'+(s.gmail_browser_connected?"Reconnect Gmail":"Connect Gmail")+'</button></div><div class="box"><form id="settings-form">'+
     '<h2>Cloud AI</h2><p id="cloud-status">Uses the saved ChatGPT login.</p><button type="button" id="check-cloud">Check ChatGPT connection</button><p>Uses your existing Codex login with ChatGPT. Plan limits apply. Search itself never runs a model. Preparing an application sends the selected post, share-approved facts and master CV text to ChatGPT.</p><label>Cloud model<input name="cloud_model" value="'+esc(s.cloud_model||'gpt-6.1-sol')+'"></label><h2>Discovery & extraction</h2><label>Operating schedule<select name="discovery_schedule_mode"><option value="manual" '+(!s.discovery_schedule_mode || s.discovery_schedule_mode==="manual"?"selected":"")+'>Manual only · Run search</option><option value="always" '+(s.discovery_schedule_mode==="always"?"selected":"")+'>Automatic intervals while app is running</option><option value="window" '+(s.discovery_schedule_mode==="window"?"selected":"")+'>Only in working window</option></select></label>'+
     '<label>Automatic check interval (minutes; ignored in manual mode)<input type="number" name="discovery_interval_minutes" min="5" max="1440" value="'+esc(s.discovery_interval_minutes || 30)+'" required></label>'+
     '<label>Maximum new model extractions per run<input name="extraction_batch_limit" type="number" min="1" max="20" value="'+esc(s.extraction_batch_limit || 5)+'"></label>'+
@@ -334,7 +339,11 @@ document.addEventListener("click",async event=>{
   const button=event.target.closest("button");
   if(!button||button.disabled)return;
   try{
-    if(button.id==="check-cloud"){const status=await fetch("/api/ai/status").then(r=>r.json());$("#cloud-status").textContent=status.message;flash(status.message);}
+    if(button.id==="connect-gmail"){const result=await post("browser/gmail-connect",{});await navigate("Review Center");await load();render();watchBrowser(result.job);flash("Sign in once in the opened Google browser window.");}
+    else if(button.dataset.browserStart)await startBrowser(button.dataset.browserStart);
+    else if(button.dataset.browserAllow){await post("browser/allow",{id:button.dataset.browserAllow});await startBrowser(button.dataset.browserAllow);}
+    else if(button.dataset.browserControl){const job=browserJobs.find(j=>j.id===button.dataset.job);button.disabled=true;try{await post("browser/control",{id:job.id,action:button.dataset.browserControl,approval_token:job.approval_token});flash(button.dataset.browserControl==="approve"?"Submitting exactly the reviewed application…":"Browser action requested");}finally{button.disabled=false;}}
+    else if(button.id==="check-cloud"){const status=await fetch("/api/ai/status").then(r=>r.json());$("#cloud-status").textContent=status.message;flash(status.message);}
     else if(button.dataset.prepare)await startPreparation(button.dataset.prepare);
     else if(button.dataset.cancelTask){await post("tasks/cancel",{id:button.dataset.cancelTask});flash("Cancelling cloud preparation…");}
     else if(button.hasAttribute("data-refresh-listings"))await mutate("agent",{action:"run"},"Fast search started. Results appear as sources finish.");
