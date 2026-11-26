@@ -26,6 +26,8 @@ def application_hash(store,ident):
 
 class BrowserApplications:
  def __init__(self,store,test_origins=(),headless=False,cloud_mapping=True):
+  from .connected_gmail import GmailApplications
+  self.gmail=GmailApplications(store)
   self.store=store;self.jobs={};self.commands={};self.cancelled={};self.lock=threading.RLock()
   self.test_origins=set(test_origins);self.headless=headless;self.cloud_mapping=cloud_mapping
   self.folder=store.directory/'browser';self.folder.mkdir(mode=0o700,exist_ok=True)
@@ -43,8 +45,9 @@ class BrowserApplications:
    temp.write_text(json.dumps(job,ensure_ascii=False));temp.chmod(0o600);temp.replace(target)
   self.store.log('Browser application · '+str(values.get('status','updated')))
  def list(self):
-  with self.lock:return sorted((dict(j,active=key in self.commands) for key,j in self.jobs.items()),key=lambda j:j.get('updated',''),reverse=True)[:30]
+  with self.lock:return sorted([dict(j,active=key in self.commands) for key,j in self.jobs.items()]+self.gmail.list(),key=lambda j:j.get('updated',''),reverse=True)[:30]
  def control(self,ident,action,token=None):
+  if ident in self.gmail.jobs:return self.gmail.control(ident,action,token)
   with self.lock:
    if ident not in self.jobs or ident not in self.commands:raise ValueError('This browser session is closed. Start preparation again.')
    job=self.jobs[ident]
@@ -55,9 +58,10 @@ class BrowserApplications:
    elif action!='refresh':raise ValueError('Unknown browser action')
    self.commands[ident].put(action)
  def cancel_all(self):
+  self.gmail.cancel_all()
   with self.lock:
    for event in self.cancelled.values():event.set()
- def start(self,ident,cancel=None):
+ def start(self,ident,cancel=None,use_browser=False):
   if cancel and cancel.is_set():raise InterruptedError()
   with self.store.db() as db:
    row=db.execute('SELECT a.payload,a.status,o.payload AS listing,o.source,o.checked,o.state FROM applications a JOIN opportunities o ON o.id=a.opportunity WHERE a.opportunity=?',(ident,)).fetchone()
@@ -75,6 +79,10 @@ class BrowserApplications:
    raise ValueError('Resolve the eligibility conflict in the prepared package before opening an application')
   url=item.get('application_link') or item.get('url');origin='://'.join(urlsplit(url)[:2])
   email=bool(app.get('email_to'))
+  if email:
+   if item['source'] not in self.store.settings().get('source_allowlist',[]) and self.store.settings().get('browser_permission:'+ident)!=destination(url):
+    raise ValueError('Review the email destination and allow this source before preparing its Gmail draft')
+   if not use_browser:return self.gmail.start(ident)
   if not email:
    if not public_url(url) and origin not in self.test_origins:raise ValueError('Only public HTTPS application portals are supported')
    official=(item['source'] in BOARDS and urlsplit(url).hostname in {'jobs.ashbyhq.com','boards.greenhouse.io','job-boards.greenhouse.io','job-boards.eu.greenhouse.io'})

@@ -237,9 +237,9 @@ def handler_for(store, agent, port):
                     raise ValueError("Invalid request")
                 path = urlsplit(self.path).path
                 if path == "/api/browser/gmail-connect":
-                    return self.json({"job": browser_apps.connect_gmail()})
+                    return self.json({"job": browser_apps.connect_gmail() if body.get("browser") is True else browser_apps.gmail.connect()})
                 if path == "/api/browser/start":
-                    return self.json({"job": browser_apps.start(str(body["id"]))})
+                    return self.json({"job": browser_apps.start(str(body["id"]), use_browser=body.get("use_browser") is True)})
                 if path == "/api/browser/control":
                     browser_apps.control(str(body["id"]), str(body["action"]), body.get("approval_token"))
                     return self.json({"ok":True})

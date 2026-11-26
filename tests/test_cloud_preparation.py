@@ -64,3 +64,10 @@ class CloudPreparation(unittest.TestCase):
   doc=response();doc['application']['used_sources']=['fact:invented-award']
   with self.assertRaises(ValueError):applications.prepare(self.store,RAW['id'],provider=lambda *a,**k:doc)
   with self.store.db() as db:self.assertEqual(db.execute('SELECT COUNT(*) FROM applications').fetchone()[0],0)
+ def test_regeneration_keeps_external_draft_identity(self):
+  provider=lambda *a,**k:response();applications.prepare(self.store,RAW['id'],provider=provider)
+  with self.store.db() as db:
+   app=json.loads(db.execute('SELECT payload FROM applications').fetchone()[0]);app['connected_gmail']={'draft_id':'saved-draft','state':'draft'}
+   db.execute('UPDATE applications SET payload=?',(json.dumps(app),))
+  applications.prepare(self.store,RAW['id'],provider=provider)
+  with self.store.db() as db:self.assertEqual(json.loads(db.execute('SELECT payload FROM applications').fetchone()[0])['connected_gmail']['draft_id'],'saved-draft')
