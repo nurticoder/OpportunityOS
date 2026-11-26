@@ -40,6 +40,23 @@ def deadline_from(text):
     return None, evidence
 
 
+MONTHS = {"января":"January","февраля":"February","марта":"March","апреля":"April","мая":"May","июня":"June","июля":"July","августа":"August","сентября":"September","октября":"October","ноября":"November","декабря":"December"}
+
+def quoted_date(quote):
+    text=quote
+    for word,english in MONTHS.items():text=re.sub(word,english,text,flags=re.I)
+    return deadline_from("Deadline: "+text)[0]
+
+PROOFS={
+ "kyrgyzstan":r"kyrgyz|кыргыз|киргиз", "india":r"\bindia[n]?\b|инди", "china":r"\bchina\b|chinese|кита", "hong kong":r"hong kong|гонконг|\bhk\b",
+ "united states":r"united states|\bu\.?s\.?a?\b|америк|сша", "uk":r"united kingdom|\buk\b|британ", "kenya":r"kenya|кени", "ethiopia":r"ethiopia|эфиоп",
+ "undergraduate":r"undergraduates?|bachelor|\bbs\b|бакалавр", "master":r"master|\bms\b|магистр|магистрат", "phd":r"ph\.?d|doctoral|аспиран|докторан",
+ "cv":r"\bcv\b|resume|résumé|резюме", "transcript":r"transcript|выписк", "cover letter":r"cover letter|мотивационн|сопроводительн", "recommendation":r"recommendation|рекомендат", "passport":r"passport|паспорт"}
+
+def supports_value(value,quote):
+    return bool(re.search(PROOFS.get(value.casefold(),re.escape(value)),quote,re.I))
+
+
 def regex_extract(raw):
     text = raw["raw_text"]
     lines = [line.strip() for line in text.splitlines() if line.strip()]
@@ -190,6 +207,8 @@ def validate_fields(document, raw, threshold):
                 value = ["All nationalities" if v.casefold() in {"any", "all", "all nationalities"} else v for v in value]
             if key == "country_of_study":
                 value = ["Any" if v.casefold() in {"any", "all", "worldwide"} else v for v in value]
+        if key in ARRAY_FIELDS and valid:
+            valid = all(supports_value(v,quote) for v in value)
         start = context.find(quote) if quote else -1
         line_start = context.rfind("\n", 0, max(0, start)) + 1
         line_end = context.find("\n", start + len(quote))
@@ -203,11 +222,11 @@ def validate_fields(document, raw, threshold):
             valid = valid and not re.search(r"old deadline|cancelled|canceled|отмен[её]н|отменено", source_line, re.I)
             try:
                 parsed = datetime.strptime(value, "%Y-%m-%d").date()
-                valid = valid and parsed.isoformat() == value and str(parsed.year) in quote
+                valid = valid and parsed.isoformat() == value and str(parsed.year) in quote and quoted_date(quote) == value
             except ValueError:
                 valid = False
         if key == "application_link" and valid:
-            valid = value.removeprefix("mailto:") in context and (
+            valid = value.removeprefix("mailto:") in quote and (
                 value.startswith("https://") or value.startswith("mailto:") and "@" in value) and method(value) != "unknown"
         if key == "apply_method":
             valid = valid and value in METHODS

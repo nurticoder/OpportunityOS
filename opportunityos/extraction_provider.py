@@ -13,7 +13,10 @@ class NoRedirect(HTTPRedirectHandler):
 
 
 def _generate(messages, schema, settings):
-    provider = settings.get("extraction_provider", "ollama")
+    provider = settings.get("extraction_provider", "codex")
+    if provider == "codex":
+        from .cloud_ai import generate as cloud_generate
+        return cloud_generate(messages, schema, settings)
     endpoint = settings.get("extraction_endpoint", "http://127.0.0.1:11434").rstrip("/")
     parsed = urlsplit(endpoint)
     if parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost", "::1"} or parsed.username or parsed.password:

@@ -9,7 +9,8 @@ const sections = Object.fromEntries(Object.entries({"Today": "<rect x=\"3\" y=\"
 const routes = {"Today":"today","Inbox":"inbox","Applications":"applications","Timeline":"timeline","Review Center":"review","Profile":"profile","Agent Activity":"activity","Sources":"sources","Settings":"settings"};
 let page=Object.keys(routes).find(k=>routes[k]===location.hash.slice(1)) || "Today";
 let data, selected, timer, triageId, pendingSubmission, dragging, evidenceTerm="";
-let formReviews=[];
+let formReviews=[], preparationTasks=[];
+const taskWatches=new Set();
 const filter={q:"",group:"",pay:false,hidden:false};
 const heading=(title,sub)=>'<div class="page-heading"><h1>'+esc(title)+'</h1><p>'+esc(sub)+'</p></div>';
 const staleNotice=()=>data.items.some(i=>i.state==="Needs refresh")?'<div class="freshness-notice"><span>Saved opportunities need a fresh check. You can still review their evidence.</span><button data-refresh-listings>Refresh opportunities</button></div>':"";
@@ -41,6 +42,8 @@ async function load(){
   data=await response.json();
   const formsResponse=await fetch("/api/reviews");
   if(formsResponse.ok)formReviews=(await formsResponse.json()).reviews;
+  const tasksResponse=await fetch("/api/tasks");if(tasksResponse.ok)preparationTasks=(await tasksResponse.json()).tasks;
+  for(const task of preparationTasks.filter(t=>["Queued","Running"].includes(t.status)))watchPreparation(task.id);
   renderAgent(data.agent,data.agent_progress);
   renderLastChecked(data.last_checked);
 }
@@ -110,13 +113,26 @@ function step(direction){
   const index=items.findIndex(i=>i.id===triageId);
   triageId=items[Math.min(items.length-1,Math.max(0,index+direction))]?.id;renderTriage();
 }
+async function startPreparation(id,prompt="",words=250){
+  const result=await post("prepare",{id,prompt,words});
+  await navigate("Review Center");await load();render();watchPreparation(result.task);
+  flash("Preparing with your ChatGPT plan. No local model is running.");
+}
+function preparationPanel(){return '<div id="preparation-list">'+preparationTasks.slice(0,8).map(t=>'<div class="preparation-job"><div><strong>'+esc(t.status)+'</strong><p>'+esc(t.message)+'</p></div>'+(t.status==="Complete"?'<button data-edit="'+esc(t.opportunity)+'">Review package</button>':["Queued","Running"].includes(t.status)?'<button data-cancel-task="'+t.id+'">Cancel</button>':'<button data-prepare="'+esc(t.opportunity)+'">Retry preparation</button>')+'</div>').join("")+'</div>';}
+async function watchPreparation(id){
+ if(taskWatches.has(id))return;taskWatches.add(id);
+ const poll=async()=>{try{const response=await fetch("/api/tasks");preparationTasks=(await response.json()).tasks;const task=preparationTasks.find(t=>t.id===id);const panel=$("#preparation-list");if(panel)panel.outerHTML=preparationPanel();
+ if(task&&["Queued","Running"].includes(task.status)){setTimeout(poll,2000);return;}
+ taskWatches.delete(id);await load();if(!$("#detail").open&&!document.activeElement.closest("textarea,input,select"))render();
+ }catch{setTimeout(poll,5000);}};setTimeout(poll,700);
+}
 async function triageChoice(choice){
   const item=data.items.find(i=>i.id===triageId);
   if(!item)return;
   const items=page==="Today"?prioritized(triageable()):hits(),index=items.findIndex(i=>i.id===item.id);
   const next=items[index+1]?.id||items[index-1]?.id;
   await post("choice",{id:item.id,choice});await load();
-  if(choice==="auto"){render();showDetail(item.id);flash("Apply preference saved. Prepare and review before submission.");}
+  if(choice==="auto"){await startPreparation(item.id);}
   else{triageId=next;render();flash(choice==="skip"?"Skipped":"Review first saved");}
 }
 function timeline(){
@@ -148,7 +164,7 @@ function pipeline(){
 }
 async function moveApplication(id,target){
   const app=data.apps.find(a=>a.opportunity===id),item=data.items.find(i=>i.id===id);
-  if(!app&&target==="Drafted"){await mutate("draft",{id,prompt:"",words:250},"Draft created for review");return;}
+  if(!app&&target==="Drafted"){await startPreparation(id);return;}
   if(!app){flash("Create a draft before moving to this stage.");return;}
   if(target==="Drafted"&&app.status==="Ready"){await mutate("application",{id,action:"save",draft:app.draft},"Returned to drafting");return;}
   if(target==="Ready"&&app.status==="Awaiting review"){
@@ -209,7 +225,7 @@ function showDetail(id){
     (i.apply_method==="google_form"?'<p><button class="primary" id="prefill-form">Prefill Google Form for review</button></p><div id="prefill-result"></div>':
     i.id.startsWith("greenhouse:")?'<p><button id="inspect-form">Check portal questions</button></p><div id="portal-questions"></div>':"")+
     '<div id="application-editor">'+(existing?application(existing):["Listed","Needs refresh"].includes(i.state)&&!i.duplicate_of&&i.eligibility!=="Ineligible"?
-    '<form id="draft-form" class="stack"><label>Application question (optional)<textarea name="prompt" maxlength="5000" placeholder="Paste the original question"></textarea></label><label>Word limit <input name="words" type="number" min="1" max="1200" value="250" required></label><button class="primary">Prepare draft for review</button></form>':empty("This record is currently unavailable for drafting."))+'</div></div>';
+    '<form id="draft-form" class="stack"><label>Application question (optional)<textarea name="prompt" maxlength="5000" placeholder="Paste the original question"></textarea></label><label>Word limit <input name="words" type="number" min="1" max="1200" value="250" required></label><button class="primary">Prepare application</button></form>':empty("This record is currently unavailable for drafting."))+'</div></div>';
   highlightPost();
   if(!$("#detail").open)$("#detail").showModal();
   $("#detail").scrollTop=0;
@@ -219,7 +235,7 @@ function activity(rows){
 }
 function reviewsPage(){
   return heading("Review Center","Decisions that need a human touch. Your drafts and prepared forms, together.")+
-    '<div id="form-reviews"></div><div class="section"><h2>Application drafts <span class="count">'+review().length+'</span></h2></div>'+
+    preparationPanel()+'<div id="form-reviews"></div><div class="section"><h2>Application drafts <span class="count">'+review().length+'</span></h2></div>'+
     (review().length?'<div class="stack">'+review().map(application).join("")+'</div>':empty("No drafts waiting. Open an opportunity to prepare your first application."));
 }
 function render(){
@@ -245,13 +261,13 @@ function application(a) {
   }
   actions.push(a.status==="Archived" ? ["restore","Restore"] : ["archive","Move to archive"]);
   return '<details class="box" data-app="'+esc(a.opportunity)+'"><summary>'+esc(displayTitle(i.title))+' <span class="chip">'+esc(a.status)+'</span></summary><p>'+link(i.url,"Open application link")+' · '+esc(a.method)+'</p>' +
-    (a.missing.length ? '<p class="muted">Unmapped standard fields: '+esc(a.missing.map(label).join(", "))+'</p>' : "") +
+    (a.missing.length ? '<div class="review-notes"><strong>Needs your attention</strong><ul>'+a.missing.map(v=>'<li>'+esc(label(v))+'</li>').join('')+'</ul></div>' : "") +
     (fieldList ? '<ul>'+fieldList+'</ul>' : "") +
     (a.prompt ? '<p><strong>Original question · '+a.words+' words</strong></p><pre>'+esc(a.prompt)+'</pre>' : "") +
     (["Awaiting review","Ready"].includes(a.status) ? '<form data-action="save"><label>Draft<textarea name="draft" maxlength="16000">'+esc(a.draft)+'</textarea></label><button>Save draft</button></form>' : '<pre>'+esc(a.draft)+'</pre>') +
     (a.status==="Ready" ? '<form data-action="submitted"><label>Portal confirmation or receipt <input name="evidence" required maxlength="2000"></label><button>Record manual submission</button></form>' : "") +
     (a.evidence ? '<p>Recorded evidence: '+esc(a.evidence)+'</p>' : "") +
-    '<div class="row actions">'+actions.map(([action,title])=>'<button data-action="'+esc(action)+'">'+esc(title)+'</button>').join("")+'</div></details>';
+    (a.method?.startsWith("ChatGPT")?'<p class="muted">Sources: '+esc((a.used_sources||[]).map(s=>s.startsWith('fact:')?'Verified '+label(s.slice(5)):'Master CV').filter((v,i,all)=>all.indexOf(v)===i).join(', '))+'</p><p>'+((a.document_ids||[]).map(id=>'<a href="/api/document/'+encodeURIComponent(id)+'">'+esc(data.documents.find(d=>d.id===id)?.name||'Master CV')+'</a>').join(', ')||'No CV attached')+'</p>'+(a.answers||[]).map(answer=>'<details><summary>'+esc(answer.question)+'</summary><p>'+esc(answer.answer)+'</p></details>').join('')+'<div class="row"><a href="/api/application/text?id='+encodeURIComponent(a.opportunity)+'">Download cover letter</a>'+ (a.email_to?'<a href="/api/application/export?id='+encodeURIComponent(a.opportunity)+'">Download email with CV</a>':'')+'</div>'+(['Awaiting review','Ready'].includes(a.status)?'<button data-prepare="'+esc(a.opportunity)+'">Regenerate with cloud AI</button>':'')+(a.email_to?'<form data-email-edit="'+esc(a.opportunity)+'"><p>To: '+esc(a.email_to)+'</p><label>Subject<input name="subject" value="'+esc(a.email_subject)+'"></label><label>Email body<textarea name="body">'+esc(a.email_body)+'</textarea></label><button>Save email draft</button></form>':''):'')+'<div class="row actions">'+actions.map(([action,title])=>'<button data-action="'+esc(action)+'">'+esc(title)+'</button>').join("")+'</div></details>';
 }
 function profile() {
   const fields = Object.values(data.facts).map(f=>'<details class="box"><summary>'+esc(label(f.key))+' <span class="chip">'+(f.verified?"Verified":f.value?"Unverified":"Missing")+'</span></summary><form data-fact="'+esc(f.key)+'"><label>Value<textarea name="value" maxlength="5000">'+esc(f.value)+'</textarea></label><label>Source <input name="source" value="'+esc(f.source)+'" maxlength="300"></label><label><input type="checkbox" name="verified" '+(f.verified?"checked":"")+'> I verified this fact</label><label><input type="checkbox" name="share" '+(f.share?"checked":"")+'> May be shared automatically when supported</label><button>Save fact</button></form></details>');
@@ -263,21 +279,21 @@ function profile() {
 function settings() {
   const s = data.settings;
   return heading("Settings","Configure discovery, ranking and optional local drafting.")+'<div class="box"><form id="settings-form">'+
-    '<h2>Discovery & extraction</h2><label>Operating schedule<select name="discovery_schedule_mode"><option value="manual" '+(!s.discovery_schedule_mode || s.discovery_schedule_mode==="manual"?"selected":"")+'>Manual only · Run search</option><option value="always" '+(s.discovery_schedule_mode==="always"?"selected":"")+'>Automatic intervals while app is running</option><option value="window" '+(s.discovery_schedule_mode==="window"?"selected":"")+'>Only in working window</option></select></label>'+
+    '<h2>Cloud AI</h2><p id="cloud-status">Uses the saved ChatGPT login.</p><button type="button" id="check-cloud">Check ChatGPT connection</button><p>Uses your existing Codex login with ChatGPT. Plan limits apply. Search itself never runs a model. Preparing an application sends the selected post, share-approved facts and master CV text to ChatGPT.</p><label>Cloud model<input name="cloud_model" value="'+esc(s.cloud_model||'gpt-6.1-sol')+'"></label><h2>Discovery & extraction</h2><label>Operating schedule<select name="discovery_schedule_mode"><option value="manual" '+(!s.discovery_schedule_mode || s.discovery_schedule_mode==="manual"?"selected":"")+'>Manual only · Run search</option><option value="always" '+(s.discovery_schedule_mode==="always"?"selected":"")+'>Automatic intervals while app is running</option><option value="window" '+(s.discovery_schedule_mode==="window"?"selected":"")+'>Only in working window</option></select></label>'+
     '<label>Automatic check interval (minutes; ignored in manual mode)<input type="number" name="discovery_interval_minutes" min="5" max="1440" value="'+esc(s.discovery_interval_minutes || 30)+'" required></label>'+
     '<label>Maximum new model extractions per run<input name="extraction_batch_limit" type="number" min="1" max="20" value="'+esc(s.extraction_batch_limit || 5)+'"></label>'+
-    '<label>Extraction provider<select name="extraction_provider">'+[["ollama","Local Ollama"],["local_chat","Local chat-completions server"],["regex","Regex fallback only"]].map(([v,t])=>'<option value="'+v+'" '+(s.extraction_provider===v?'selected':'')+'>'+t+'</option>').join("")+'</select></label>'+
-    '<label>Extraction model<input name="extraction_model" value="'+esc(s.extraction_model || "qwen3:4b")+'" required></label>'+
+    '<label>Extraction provider<select name="extraction_provider">'+[["codex","ChatGPT via Codex · cloud"],["regex","Fast rules only"],["ollama","Ollama · optional local inference"],["local_chat","Local chat server · optional"]].map(([v,t])=>'<option value="'+v+'" '+(s.extraction_provider===v?'selected':'')+'>'+t+'</option>').join("")+'</select></label>'+
+    '<label>Local model (only used with local providers)<input name="extraction_model" value="'+esc(s.extraction_model || "qwen3:4b")+'" required></label>'+
     '<label>Local provider endpoint<input name="extraction_endpoint" value="'+esc(s.extraction_endpoint || "http://127.0.0.1:11434")+'" required></label>'+
     '<label>Minimum field confidence<input type="number" name="extraction_threshold" min="0.5" max="1" step="0.05" value="'+esc(s.extraction_threshold || .8)+'"></label>'+
-    '<p class="muted">Posts stay on this Mac. Unavailable or invalid model output uses the labeled regex fallback. Unchanged posts reuse extraction. New inference is limited by the budget above. Manual mode never starts discovery at login or on a timer. Ollama unloads the extraction model after each request.</p>'+
+    '<p class="muted">Search saves posts quickly without model inference. Cloud AI is used for explicit application preparation and post extraction; local providers run only if you select them. Manual mode never starts discovery at login or on a timer. Ollama unloads the extraction model after each request.</p>'+
     '<h2>Working window · Hong Kong</h2><div class="row">'+["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((d,n)=>'<label><input type="checkbox" name="days" value="'+n+'" '+(s.days.includes(n)?"checked":"")+'> '+d+'</label>').join("")+'</div>'+
     '<div class="row"><label>Starts <input name="start" type="time" value="'+esc(s.start)+'" required></label><label>Ends <input name="end" type="time" value="'+esc(s.end)+'" required></label></div>'+
     '<label><input name="ac_only" type="checkbox" '+(s.ac_only?"checked":"")+'> Run on AC power only</label><h2>Official employer boards</h2><div class="row">'+
     Object.entries(data.sources).filter(([k])=>!k.startsWith("telegram:")).map(([k,v])=>'<label><input type="checkbox" name="sources" value="'+esc(k)+'" '+(s.enabled_sources.includes(k)?"checked":"")+'> '+esc(v)+'</label>').join("")+
     '</div><h2>Public Telegram channels</h2><label>Channel usernames, separated by spaces<textarea name="telegram_channels" placeholder="channel_one channel_two">'+esc((s.telegram_channels || []).join(" "))+'</textarea></label>'+
     '<label>Sources allowed for form prefill<textarea name="source_allowlist" placeholder="telegram:channel_one">'+esc((s.source_allowlist || []).join(" "))+'</textarea></label><p class="muted">Adding a channel enables discovery. The allow-list permits verified, share-approved facts to be entered in its linked Google Forms when you click Prefill.</p><h2>Ranking weights</h2><div class="form-grid">'+Object.entries(s.weights).map(([k,v])=>'<label>'+esc(label(k))+' <input type="number" min="0" max="100" required name="'+esc(k)+'" value="'+v+'"></label>').join("")+
-    '</div><h2>Drafting</h2><label>Ollama model (optional)<input name="ollama_model" maxlength="100" value="'+esc(s.ollama_model)+'" placeholder="Installed local model"></label><label>Essay style and instructions<textarea name="essay_style" maxlength="2000">'+esc(s.essay_style)+'</textarea></label><button class="primary">Save settings</button></form></div>'+telegramSettings();
+    '</div><h2>Legacy local drafting (unused by cloud preparation)</h2><label>Ollama model (optional)<input name="ollama_model" maxlength="100" value="'+esc(s.ollama_model)+'" placeholder="Installed local model"></label><label>Essay style and instructions<textarea name="essay_style" maxlength="2000">'+esc(s.essay_style)+'</textarea></label><button class="primary">Save settings</button></form></div>'+telegramSettings();
 }
 async function watchReview(id) {
   try {
@@ -318,7 +334,10 @@ document.addEventListener("click",async event=>{
   const button=event.target.closest("button");
   if(!button||button.disabled)return;
   try{
-    if(button.hasAttribute("data-refresh-listings"))await mutate("agent",{action:"run"},"Fast search started. Results appear as sources finish.");
+    if(button.id==="check-cloud"){const status=await fetch("/api/ai/status").then(r=>r.json());$("#cloud-status").textContent=status.message;flash(status.message);}
+    else if(button.dataset.prepare)await startPreparation(button.dataset.prepare);
+    else if(button.dataset.cancelTask){await post("tasks/cancel",{id:button.dataset.cancelTask});flash("Cancelling cloud preparation…");}
+    else if(button.hasAttribute("data-refresh-listings"))await mutate("agent",{action:"run"},"Fast search started. Results appear as sources finish.");
     else if(button.dataset.nav)await navigate(button.dataset.nav);
     else if(button.dataset.detail)showDetail(button.dataset.detail);
     else if(button.dataset.laneTarget){
@@ -413,9 +432,9 @@ document.addEventListener("submit",async event=>{
       selected=data.items.find(i=>i.id===selected.id);
     }
     else if(form.id==="draft-form"){
-      await mutate("draft",{id:selected.id,prompt:values.get("prompt"),words:Number(values.get("words"))},"Draft placed in the Review Center");
-      await navigate("Review Center");
+      await startPreparation(selected.id,values.get("prompt"),Number(values.get("words")));
     }
+    else if(form.dataset.emailEdit){await post("application/email",{id:form.dataset.emailEdit,subject:values.get("subject"),body:values.get("body")});await load();showApplication(form.dataset.emailEdit);flash("Email draft saved");}
     else if(form.dataset.action)await mutate("application",{...Object.fromEntries(values),id:form.closest("[data-app]").dataset.app,action:form.dataset.action},"Application updated");
     else if(form.dataset.fact)await mutate("fact",{key:form.dataset.fact,value:values.get("value"),source:values.get("source"),verified:values.has("verified"),share:values.has("share")},"Profile saved");
     else if(form.id==="settings-form")await mutate("settings",{...Object.fromEntries(values),ac_only:values.has("ac_only"),discovery_interval_minutes:Number(values.get("discovery_interval_minutes")),extraction_threshold:Number(values.get("extraction_threshold")),days:values.getAll("days").map(Number),enabled_sources:values.getAll("sources"),weights:Object.fromEntries(Object.keys(data.settings.weights).map(k=>[k,Number(values.get(k))]))},"Settings saved");

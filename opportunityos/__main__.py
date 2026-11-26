@@ -9,7 +9,7 @@ import threading
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, parse_qs
 
 from .agent import Agent
 from .sources import BOARDS, inspect_form, source_names
@@ -23,6 +23,8 @@ from .evaluation import evaluate
 from .store import DEFAULTS, Store, now
 from .workflow import prepare, transition
 from .identity import group_duplicates
+from .tasks import Tasks
+from . import applications as application_service, cloud_ai, documents as document_library
 
 STATIC = Path(__file__).with_name("static")
 MAX_BODY = 14_100_000
@@ -84,7 +86,7 @@ def update_settings(store, body):
         raise ValueError("Allow-list entries must be enabled sources or configured Telegram channels")
     current_settings = store.settings()
     provider = body.get("extraction_provider", current_settings.get("extraction_provider", "ollama"))
-    if provider not in {"ollama", "local_chat", "regex"}:
+    if provider not in {"codex", "ollama", "local_chat", "regex"}:
         raise ValueError("Choose a supported extraction provider")
     interval = int(body.get("discovery_interval_minutes", current_settings.get("discovery_interval_minutes", 30)))
     batch_limit = int(body.get("extraction_batch_limit", current_settings.get("extraction_batch_limit", 5)))
@@ -99,7 +101,9 @@ def update_settings(store, body):
     schedule_mode = body.get("discovery_schedule_mode", current_settings.get("discovery_schedule_mode", "manual"))
     if schedule_mode not in {"manual", "always", "window"}:
         raise ValueError("Choose an operating schedule")
-    values = {"extraction_batch_limit": batch_limit, "extraction_provider": provider, "extraction_model": model, "extraction_endpoint": endpoint,
+    cloud_model = str(body.get("cloud_model", current_settings.get("cloud_model", "gpt-6.1-sol"))).strip()
+    if not re.fullmatch(r"[A-Za-z0-9_.-]{1,100}", cloud_model): raise ValueError("Choose a valid cloud model name")
+    values = {"cloud_model": cloud_model, "extraction_batch_limit": batch_limit, "extraction_provider": provider, "extraction_model": model, "extraction_endpoint": endpoint,
               "extraction_threshold": threshold, "discovery_interval_minutes": interval, "discovery_schedule_mode": schedule_mode,
               "telegram_channels": channels, "source_allowlist": allowlist, "start": start, "end": end, "days": days, "enabled_sources": sources,
               "weights": weights, "ac_only": body["ac_only"] is True,
@@ -136,13 +140,14 @@ def import_document(store, body):
 def handler_for(store, agent, port):
     authority = f"127.0.0.1:{port}"
     reviews = FormReviews(store)
+    preparations = Tasks(store)
 
     class Handler(BaseHTTPRequestHandler):
         def log_request(self, code="-", size="-"):
             if isinstance(code, int) and code >= 500:
                 self.log_message("Local request failed with HTTP %d", code)
 
-        def send(self, data, kind, status=200):
+        def send(self, data, kind, status=200, headers=None):
             self.send_response(status)
             self.send_header("Content-Type", kind)
             self.send_header("Content-Length", str(len(data)))
@@ -150,6 +155,8 @@ def handler_for(store, agent, port):
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("Referrer-Policy", "no-referrer")
             self.send_header("Content-Security-Policy", "default-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+            for key, value in (headers or {}).items():
+                self.send_header(key, value)
             self.end_headers()
             self.wfile.write(data)
 
@@ -160,6 +167,28 @@ def handler_for(store, agent, port):
             if self.headers.get("Host") != authority:
                 return self.json({"error": "Use the printed localhost address"}, 403)
             path = urlsplit(self.path).path
+            if path.startswith("/api/document/"):
+                try:
+                    ident = path.rsplit("/", 1)[-1]
+                    if not re.fullmatch(r"[a-f0-9]{32}", ident): raise ValueError("Invalid document")
+                    doc, content = document_library.document_bytes(store, ident)
+                    suffix = Path(doc["name"]).suffix.lower()
+                    kind = {".pdf":"application/pdf", ".docx":"application/vnd.openxmlformats-officedocument.wordprocessingml.document", ".txt":"text/plain; charset=utf-8"}.get(suffix, "application/octet-stream")
+                    return self.send(content, kind, headers={"Content-Disposition": 'attachment; filename="master-cv'+suffix+'"'})
+                except ValueError as error: return self.json({"error":str(error)}, 400)
+            if path == "/api/tasks":
+                return self.json({"tasks": preparations.list()})
+            if path == "/api/ai/status":
+                return self.json(cloud_ai.status())
+            if path in {"/api/application/export", "/api/application/text"}:
+                try:
+                    ident = parse_qs(urlsplit(self.path).query).get("id", [""])[0]
+                    if path.endswith("export"):
+                        return self.send(application_service.email_file(store, ident), "message/rfc822", headers={"Content-Disposition": 'attachment; filename="application.eml"'})
+                    with store.db() as db: row = db.execute("SELECT payload FROM applications WHERE opportunity=?", (ident,)).fetchone()
+                    if not row: raise ValueError("Application not found")
+                    return self.send(json.loads(row["payload"])["draft"].encode(), "text/plain; charset=utf-8", headers={"Content-Disposition": 'attachment; filename="cover-letter.txt"'})
+                except ValueError as error: return self.json({"error": str(error)}, 400)
             if path.startswith("/api/review/"):
                 ident = path.rsplit("/", 1)[-1]
                 if not re.fullmatch(r"[a-f0-9]{32}", ident):
@@ -197,6 +226,25 @@ def handler_for(store, agent, port):
                 if not isinstance(body, dict):
                     raise ValueError("Invalid request")
                 path = urlsplit(self.path).path
+                if path == "/api/prepare":
+                    ident = str(body["id"])
+                    words = int(body.get("words", 250))
+                    if not 1 <= words <= 1200: raise ValueError("Word limit must be between 1 and 1200")
+                    prompt = str(body.get("prompt", ""))[:5000]
+                    task = preparations.start(ident, lambda cancel, progress: application_service.prepare(store, ident, prompt, words, cancel=cancel, progress=progress))
+                    return self.json({"task": task})
+                if path == "/api/tasks/cancel":
+                    preparations.cancel(body.get("id"))
+                    return self.json({"ok": True})
+                if path == "/api/application/email":
+                    with store.db() as db:
+                        row = db.execute("SELECT payload,status FROM applications WHERE opportunity=?", (body["id"],)).fetchone()
+                        if not row or row["status"] not in {"Awaiting review", "Ready"}: raise ValueError("This email draft cannot be changed")
+                        payload = json.loads(row["payload"])
+                        payload.update(email_subject=str(body["subject"]).replace("\n", " ").replace("\r", " ")[:250], email_body=str(body["body"])[:16000], version=payload.get("version", 0)+1)
+                        db.execute("UPDATE applications SET payload=?,status='Awaiting review',updated=? WHERE opportunity=?", (json.dumps(payload), now(), body["id"]))
+                    store.log("Application email draft updated")
+                    return self.json({"ok": True})
                 if path == "/api/sources/add":
                     channel = channel_name(body["channel"])
                     with store.db() as db:
@@ -258,6 +306,7 @@ def handler_for(store, agent, port):
                     agent.start()
                 elif action in {"pause", "stop"}:
                     agent.control(action)
+                    if action == "stop": preparations.cancel()
                 else:
                     raise ValueError("Unknown agent action")
             elif path == "/api/fact":
