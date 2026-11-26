@@ -1,0 +1,14 @@
+# OpportunityOS working instructions
+
+The owner wants a working local product and has given a standing instruction to finish tested changes with a feature branch, commit, push, pull request and merge to this repository's main branch. Complete the implementation and relevant checks, then perform that workflow. Verify and report the actual remote result. Never force-push, overwrite unrelated changes, publish the private repository, or upload personal data. A later explicit user instruction takes precedence.
+
+- Preserve store.py, workflow.py and the existing profile/facts system. Extend through adjacent modules instead of replacing them.
+- Search is manual by default. Do not enable recurring discovery, start local inference or load an Ollama model on startup. The active cloud provider uses the owner's existing ChatGPT authentication and plan allowance; no API-key fallback or additional charges.
+- User data, documents, credentials and browser profiles belong outside the checkout, under the private OpportunityOS application folder. Do not commit databases, imported CVs, test evidence containing personal data, tokens or browser screenshots. Keep work/ and outputs/ ignored.
+- Use authentic verified/share-approved facts and the single master CV. Unknown facts stay unknown. Never infer work authorization, qualifications, dates or legal consent.
+- Every real submission/send requires explicit approval of the particular application/draft. Preserve source permission checks, preview binding, one-use approvals, exact-argument connector gates, confirmation evidence and duplicate prevention. Tests must use disposable local forms or intercepted/synthetic mailboxes. Do not send test mail or real applications to exercise delivery without explicit per-message approval.
+- Native connected Gmail is the primary draft path; the isolated browser and unsent email file are fallbacks. Do not copy personal browser profiles or collect passwords.
+- Do not bypass website restrictions, authentication controls, CAPTCHA or assessments. Mark unsupported/ambiguous outcomes accurately and preserve prepared work.
+- Run relevant backend checks with `PYTHONPATH=. .venv/bin/python -m unittest discover -s tests -p 'test_*.py'`. Browser integration tests need the existing Playwright dependency and Chrome. Use tests/ui_browser_smoke.py for all-pages desktop/mobile checks and tests/browser_review_ui_smoke.py for intercepted approval controls.
+- Use `python -m opportunityos.service install` to stage the local macOS runtime after checks. First ensure no browser or preparation job is active. Verify localhost:8765 and deployed file equality; Git merge alone does not deploy the running app.
+- Update PROGRESS.md and README for material behavior changes. Distinguish tested drafts, safe test submissions, real delivery and unsupported portals. Do not promise universal website reliability.
