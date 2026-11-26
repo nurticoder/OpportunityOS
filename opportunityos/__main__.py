@@ -22,6 +22,7 @@ from .google_forms import FormReviews
 from .evaluation import evaluate
 from .store import DEFAULTS, Store, now
 from .workflow import prepare, transition
+from .identity import group_duplicates
 
 STATIC = Path(__file__).with_name("static")
 MAX_BODY = 14_100_000
@@ -55,8 +56,8 @@ def snapshot(store, agent):
                 for row in db.execute("SELECT * FROM applications ORDER BY updated DESC")]
         for app in apps:
             del app["payload"]
-        return {"items": sorted(items, key=lambda item: (-item["score"], item["title"])),
-                "facts": facts, "apps": apps, "agent": agent.state, "settings": settings,
+        return {"items": sorted(group_duplicates(items, apps), key=lambda item: (-item["score"], item["title"])),
+                "facts": facts, "apps": apps, "agent": agent.state, "agent_progress": dict(agent.progress), "settings": settings,
                 "last_checked": last_checked(store),
                 "sources": source_names(settings), "health": [dict(r) for r in db.execute("SELECT * FROM health")],
                 "documents": [dict(r) for r in db.execute("SELECT * FROM documents ORDER BY added DESC")],
@@ -175,7 +176,7 @@ def handler_for(store, agent, port):
             if path == "/api/heartbeat":
                 with store.db() as db:
                     revision = db.execute("SELECT COALESCE(MAX(rowid), 0) FROM activity").fetchone()[0]
-                return self.json({"agent": agent.state, "revision": revision, "last_checked": last_checked(store)})
+                return self.json({"agent": agent.state, "agent_progress": dict(agent.progress), "revision": revision, "last_checked": last_checked(store)})
             assets = {"/": ("index.html", "text/html"), "/style.css": ("style.css", "text/css"),
                       "/app.js": ("app.js", "text/javascript"), "/sandbox": ("sandbox.html", "text/html"),
                       "/sandbox.js": ("sandbox.js", "text/javascript")}

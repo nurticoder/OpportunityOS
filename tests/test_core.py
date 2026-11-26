@@ -103,6 +103,8 @@ class Core(unittest.TestCase):
         from threading import Event
 
         entered, release = Event(), Event()
+        with self.store.db() as db:
+            db.execute("INSERT INTO settings VALUES ('discovery_workers', '1')")
         def blocking_fetch(store, board, **kwargs):
             entered.set()
             release.wait(3)

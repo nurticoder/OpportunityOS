@@ -4,6 +4,9 @@ import threading
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
+from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
+import time
+
 from .sources import refresh, source_names
 from .store import now
 from .notifications import notify
@@ -30,6 +33,7 @@ class Agent:
         self.state = "Idle"
         self.enabled = True
         self.worker = None
+        self.progress = {}
 
     def request_source(self, source):
         with self.condition:
@@ -80,41 +84,61 @@ class Agent:
                 settings["ac_only"] and not on_ac())
 
     def run(self, scheduled, settings, sources=None):
-        self.store.log("Discovery started")
-        todo = list(sources if sources is not None else ["telegram:" + c for c in settings.get("telegram_channels", [])] + settings["enabled_sources"])
-        processed = set()
-        budget = {"remaining": settings.get("extraction_batch_limit", 5)}
+        started = time.monotonic()
+        todo = list(dict.fromkeys(sources if sources is not None else ["telegram:" + c for c in settings.get("telegram_channels", [])] + settings["enabled_sources"]))
+        self.progress = {"phase": "Fetching public sources", "done": 0, "total": len(todo), "posts": 0}
+        self.store.log("Fast discovery started · no model inference")
+        processed, running = set(), {}
+        workers = max(1, min(4, int(settings.get("discovery_workers", 3))))
+        def fetch_one(source):
+            if self.interrupted(scheduled, settings):
+                raise InterruptedError()
+            with self.store.db() as db:
+                db.execute("INSERT OR REPLACE INTO health VALUES (?, ?, 'Fetching', 0)", (source, now()))
+            return refresh(self.store, source, quick=True, should_stop=lambda: self.interrupted(scheduled, settings))
         try:
-            while todo:
-                source = todo.pop(0)
-                if self.interrupted(scheduled, settings):
-                    break
-                processed.add(source)
-                try:
-                    with self.store.db() as db:
-                        db.execute("INSERT OR REPLACE INTO health VALUES (?, ?, 'Fetching', 0)", (source, now()))
-                    refresh(self.store, source, budget=budget, should_stop=lambda: self.interrupted(scheduled, settings))
-                    with self.store.db() as db:
-                        db.execute("INSERT OR REPLACE INTO settings VALUES ('last_discovery_success', ?)", (json.dumps(now()),))
-                        row = db.execute("SELECT value FROM settings WHERE key='pending_sources'").fetchone()
-                        pending = json.loads(row["value"]) if row else []
-                        db.execute("INSERT OR REPLACE INTO settings VALUES ('pending_sources', ?)",
-                                   (json.dumps([p for p in pending if p != source]),))
-                except InterruptedError:
-                    self.store.log("Discovery deferred between posts")
-                    break
-                except (OSError, ValueError, KeyError, TypeError) as error:
-                    with self.store.db() as db:
-                        db.execute("INSERT OR REPLACE INTO health VALUES (?, ?, ?, 0)", (source, now(), type(error).__name__))
-                    self.store.log(f"{source_names(settings).get(source, source)} · unavailable ({type(error).__name__})")
-                pending = self.store.settings().get("pending_sources", [])
-                todo.extend(p for p in pending if p not in processed and p not in todo)
+            with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="discovery") as pool:
+                while todo or running:
+                    interrupted = self.interrupted(scheduled, settings)
+                    while todo and len(running) < workers and not interrupted:
+                        source = todo.pop(0)
+                        processed.add(source)
+                        running[pool.submit(fetch_one, source)] = source
+                    if not running:
+                        break
+                    completed, _ = wait(running, timeout=.2, return_when=FIRST_COMPLETED)
+                    for future in completed:
+                        source = running.pop(future)
+                        try:
+                            count = future.result() or 0
+                            self.progress["posts"] += count
+                            with self.store.db() as db:
+                                db.execute("INSERT OR REPLACE INTO settings VALUES ('last_discovery_success', ?)", (json.dumps(now()),))
+                                row = db.execute("SELECT value FROM settings WHERE key='pending_sources'").fetchone()
+                                pending = json.loads(row["value"]) if row else []
+                                db.execute("INSERT OR REPLACE INTO settings VALUES ('pending_sources', ?)", (json.dumps([p for p in pending if p != source]),))
+                        except InterruptedError:
+                            with self.store.db() as db:
+                                db.execute("INSERT OR REPLACE INTO health VALUES (?, ?, 'Queued', 0)", (source, now()))
+                        except Exception as error:
+                            with self.store.db() as db:
+                                db.execute("INSERT OR REPLACE INTO health VALUES (?, ?, ?, 0)", (source, now(), type(error).__name__))
+                            self.store.log(f"{source} · unavailable ({type(error).__name__})")
+                        self.progress["done"] += 1
+                    if self.interrupted(scheduled, settings):
+                        todo.clear()
+                    else:
+                        pending = self.store.settings().get("pending_sources", [])
+                        added = [p for p in pending if p not in processed and p not in todo]
+                        todo.extend(added)
+                        self.progress["total"] += len(added)
             if not self.interrupted(scheduled, settings):
                 notify(self.store, should_stop=lambda: self.interrupted(scheduled, settings))
         finally:
+            self.progress.update(phase="Stopped" if self.interrupted(scheduled, settings) else "Finished", seconds=round(time.monotonic()-started, 1))
             with self.condition:
                 self.state = "Stopped" if self.state == "Stopping" else "Paused" if self.state == "Paused" else "Idle"
-            self.store.log("Discovery finished")
+            self.store.log(f"Discovery finished · {self.progress['posts']} posts in {self.progress['seconds']}s")
 
     def tick(self, moment):
         settings = self.store.settings()
